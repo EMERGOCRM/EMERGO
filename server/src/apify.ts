@@ -120,7 +120,7 @@ export async function runActor(body: ApifyRunBody): Promise<unknown[]> {
       const err = e as ApifyError;
       if (err.status === 400 && /website/i.test(err.body || '')) {
         const retryInput = { ...baseInput };
-        delete (retryInput as Record<string, unknown>).website;
+        delete (retryInput as { website?: unknown }).website;
         data = await postRun(actorPath, retryInput, ctrl.signal);
       } else {
         throw e;

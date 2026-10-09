@@ -15,7 +15,8 @@ router.get('/config', async (_req: Request, res: Response) => {
       const rows = await query<{ value: { actor?: string } }>(
         "SELECT value FROM settings WHERE key = 'apify' LIMIT 1"
       );
-      if (rows.length && rows[0].value?.actor) actor = rows[0].value.actor;
+      const stored = rows.length ? rows[0].value?.actor : undefined;
+      if (stored) actor = stored;
     }
   } catch {
     /* la BD puede no estar lista; seguimos con el valor por defecto */
