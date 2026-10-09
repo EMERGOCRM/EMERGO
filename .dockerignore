@@ -1,0 +1,13 @@
+node_modules
+**/node_modules
+dist
+**/dist
+.git
+.gitignore
+.file-versions
+.od-frames
+.od-skills
+*.png
+.env
+**/.env
+!.env.example
