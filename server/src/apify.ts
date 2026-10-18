@@ -43,7 +43,7 @@ export function buildApifyInput(params: SearchParams, limit: number, sinWeb = tr
 
   const input: Record<string, unknown> = {
     searchStringsArray: [q],
-    countryCode: 'ES',
+    countryCode: 'es',
     locationQuery,
     city: zona,
     maxCrawledPlacesPerSearch: limit,
@@ -184,7 +184,12 @@ export async function runActor(body: ApifyRunBody): Promise<unknown[]> {
   const actor = String(body.actor || env.apifyActor).trim();
   const path = actorPath(actor);
   const limit = Math.max(1, Math.min(120, body.params?.max || 60));
-  const baseInput = body.input || buildApifyInput(body.params || {}, limit, body.sinWeb !== false);
+  const baseInput: Record<string, unknown> = {
+    ...(body.input || buildApifyInput(body.params || {}, limit, body.sinWeb !== false))
+  };
+  if (typeof baseInput.countryCode === 'string') {
+    baseInput.countryCode = baseInput.countryCode.toLowerCase();
+  }
 
   const ctrl = new AbortController();
   const to = setTimeout(() => ctrl.abort(), env.apifyTimeoutMs);

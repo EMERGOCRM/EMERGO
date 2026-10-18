@@ -6,16 +6,20 @@ Este repositorio contiene el frontend estático (`index.html`) **y** el API
 
 ## Versión
 
-**Versión actual: 1.0.1** (18/10/2026)
+**Versión actual: 1.0.2** (18/10/2026)
 
 - Se muestra en la app (sidebar, login y Configuración) y en `VERSION`.
 - Antes de generar cada ZIP, sube la versión en **los cuatro sitios**:
   `index.html` (`APP_VERSION` y `APP_RELEASE`), `VERSION`, este README y
   `server/package.json`.
-- Nombra el ZIP con la versión, por ejemplo: `crm-captacion-v1.0.1.zip`.
+- Nombra el ZIP con la versión, por ejemplo: `crm-captacion-v1.0.2.zip`.
 
 ### Historial
 
+- **1.0.2** — Corrige el error de búsqueda en Apify: `countryCode` se enviaba
+  como `ES` y el actor solo acepta el código ISO en minúsculas (`es`). Afectaba
+  a cualquier búsqueda (por ejemplo «Brunch»). También se normaliza en el
+  backend para tolerar clientes antiguos.
 - **1.0.1** — Paquete corregido para GitHub: incluye la búsqueda por palabras
   clave, la selección masiva de leads y el historial de búsquedas corregido.
   El ZIP anterior subido a GitHub era la build antigua sin estos cambios.
@@ -79,7 +83,7 @@ La búsqueda envía al actor `compass/crawler-google-places`:
 {
   "searchStringsArray": ["Clínica dental Málaga"],
   "locationQuery": "Málaga, España",
-  "countryCode": "ES",
+  "countryCode": "es",
   "city": "Málaga",
   "maxCrawledPlacesPerSearch": 10,
   "language": "es",
