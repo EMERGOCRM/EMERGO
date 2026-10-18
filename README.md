@@ -6,16 +6,19 @@ Este repositorio contiene el frontend estático (`index.html`) **y** el API
 
 ## Versión
 
-**Versión actual: 1.0.0** (18/10/2026)
+**Versión actual: 1.0.1** (18/10/2026)
 
 - Se muestra en la app (sidebar, login y Configuración) y en `VERSION`.
 - Antes de generar cada ZIP, sube la versión en **los cuatro sitios**:
   `index.html` (`APP_VERSION` y `APP_RELEASE`), `VERSION`, este README y
   `server/package.json`.
-- Nombra el ZIP con la versión, por ejemplo: `crm-captacion-v1.0.0.zip`.
+- Nombra el ZIP con la versión, por ejemplo: `crm-captacion-v1.0.1.zip`.
 
 ### Historial
 
+- **1.0.1** — Paquete corregido para GitHub: incluye la búsqueda por palabras
+  clave, la selección masiva de leads y el historial de búsquedas corregido.
+  El ZIP anterior subido a GitHub era la build antigua sin estos cambios.
 - **1.0.0** — Versión inicial numerada: búsqueda por palabras clave, selección
   masiva de leads (asignar, estado, no contactar, exportar y eliminar),
   historial de búsquedas corregido e integración con Google Maps vía Apify.
