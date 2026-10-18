@@ -1,11 +1,12 @@
 import path from 'path';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import { env } from './env';
+import { env, hasAI } from './env';
 import { migrate, dbEnabled, dbHealthy, closePool } from './db';
 import searchRoutes from './routes/search';
 import leadRoutes from './routes/leads';
 import configRoutes from './routes/config';
+import aiRoutes from './routes/ai';
 
 const app = express();
 
@@ -23,7 +24,8 @@ app.get('/health', async (_req: Request, res: Response) => {
     service: 'crm-multimesa-server',
     time: new Date().toISOString(),
     db: { configured: dbEnabled(), up: db },
-    apify: { configured: !!env.apifyToken.trim() }
+    apify: { configured: !!env.apifyToken.trim() },
+    ai: { configured: hasAI(), model: hasAI() ? env.openaiModel : null }
   });
 });
 
@@ -35,6 +37,7 @@ app.get('/api/health', (_req: Request, res: Response) => {
 app.use('/api', searchRoutes);
 app.use('/api', leadRoutes);
 app.use('/api', configRoutes);
+app.use('/api', aiRoutes);
 
 // --- Frontend estático (index.html + assets) -----------------------------
 const staticDir = process.env.STATIC_DIR

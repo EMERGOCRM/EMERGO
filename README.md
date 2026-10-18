@@ -6,16 +6,21 @@ Este repositorio contiene el frontend estático (`index.html`) **y** el API
 
 ## Versión
 
-**Versión actual: 1.0.2** (18/10/2026)
+**Versión actual: 1.1.0** (18/10/2026)
 
 - Se muestra en la app (sidebar, login y Configuración) y en `VERSION`.
 - Antes de generar cada ZIP, sube la versión en **los cuatro sitios**:
   `index.html` (`APP_VERSION` y `APP_RELEASE`), `VERSION`, este README y
   `server/package.json`.
-- Nombra el ZIP con la versión, por ejemplo: `crm-captacion-v1.0.2.zip`.
+- Nombra el ZIP con la versión, por ejemplo: `crm-captacion-v1.1.0.zip`.
 
 ### Historial
 
+- **1.1.0** — Estudio web en 3 pasos (fuentes, prompt IA y demo), prompt
+  enriquecido con datos verificables y análisis de enlaces públicos, imágenes
+  por sector, copia de seguridad/restauración de datos locales, deshacer y
+  eliminar búsquedas, borrado seguro de leads y endpoints `/api/ai` +
+  `/api/enrich` (clave de IA solo en el servidor).
 - **1.0.2** — Corrige el error de búsqueda en Apify: `countryCode` se enviaba
   como `ES` y el actor solo acepta el código ISO en minúsculas (`es`). Afectaba
   a cualquier búsqueda (por ejemplo «Brunch»). También se normaliza en el
@@ -38,7 +43,8 @@ Este repositorio contiene el frontend estático (`index.html`) **y** el API
 │  │  ├─ db.ts           # pool PostgreSQL + migración
 │  │  ├─ schema.sql      # tablas leads / searches / settings
 │  │  ├─ apify.ts        # proxy al actor de Apify (token en servidor)
-│  │  └─ routes/         # search, leads, config
+│  │  ├─ ai.ts           # IA OpenAI-compatible + análisis de enlaces
+│  │  └─ routes/         # search, leads, config, ai
 │  ├─ Dockerfile
 │  ├─ .env.example
 │  └─ Procfile
@@ -50,16 +56,35 @@ Este repositorio contiene el frontend estático (`index.html`) **y** el API
 
 | Método | Ruta               | Descripción                                             |
 | ------ | ------------------ | ------------------------------------------------------- |
-| GET    | `/health`          | Estado del servicio, BD y Apify.                        |
+| GET    | `/health`          | Estado del servicio, BD, Apify e IA.                    |
 | POST   | `/api/search`      | Ejecuta el actor de Apify. El token vive en el servidor.|
 | POST   | `/api/leads`       | Inserta/actualiza leads (array o `{ leads: [] }`).      |
 | GET    | `/api/leads`       | Lista leads (`?estado=&asignado_a=&limit=&offset=`).    |
 | GET    | `/api/leads/:id`   | Devuelve un lead.                                       |
 | GET    | `/api/config`      | Config pública (sin secretos).                          |
 | PUT    | `/api/config`      | Actualiza el actor de Apify (tabla `settings`).         |
+| GET    | `/api/ai/status`   | Indica si el servidor tiene IA y qué modelo usa.        |
+| POST   | `/api/ai`          | Genera el copy JSON de la demo a partir del brief.      |
+| POST   | `/api/enrich`      | Descarga hasta 3 enlaces públicos y resume su contenido.|
 
 `POST /api/search` acepta `{ actor?, input?, params?, persist? }`. Si envías
 `params` (`{ sector, zona, max }`), el servidor construye el input del actor.
+
+## Inteligencia artificial
+
+La demo web y el análisis de fuentes funcionan de dos formas:
+
+1. **Backend (recomendado).** Define `OPENAI_API_KEY` (y opcionalmente
+   `OPENAI_BASE_URL` y `OPENAI_MODEL`) en el servidor. El navegador llama a
+   `/api/ai` y `/api/enrich`; la clave nunca llega al cliente. Compatible con
+   OpenAI, Groq, Together, Ollama o LM Studio.
+2. **Navegador.** En **Administración → Configuración → Inteligencia artificial**
+   puedes guardar un endpoint compatible y una clave en `localStorage`. Solo se
+   usa si no hay backend configurado. El análisis de enlaces requiere backend.
+
+El prompt incluye instrucciones anti-invención: los datos dudosos se marcan
+como `[POR CONFIRMAR]` y la IA debe basarse en la ficha, Google Maps y las
+fuentes públicas analizadas.
 
 ## Conectar Google Maps (Apify) y captar leads
 

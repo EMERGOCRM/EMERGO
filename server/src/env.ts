@@ -26,6 +26,13 @@ export const env = {
   apifyApi: str('APIFY_API', 'https://api.apify.com/v2'),
   apifyTimeoutMs: int('APIFY_TIMEOUT_MS', 185000),
 
+  // IA compatible con OpenAI (OpenAI, Groq, Together, Ollama…). La clave vive
+  // solo en el servidor; el navegador nunca la recibe.
+  openaiApiKey: str('OPENAI_API_KEY', ''),
+  openaiBaseUrl: str('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
+  openaiModel: str('OPENAI_MODEL', 'gpt-4o-mini'),
+  aiTimeoutMs: int('AI_TIMEOUT_MS', 60000),
+
   // Orígenes permitidos para CORS (separados por coma). "*" permite todos.
   corsOrigin: str('CORS_ORIGIN', '*'),
 
@@ -34,4 +41,8 @@ export const env = {
 
 export function hasApifyToken(): boolean {
   return !!env.apifyToken.trim();
+}
+
+export function hasAI(): boolean {
+  return !!env.openaiApiKey.trim();
 }
