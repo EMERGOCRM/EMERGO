@@ -30,7 +30,8 @@ router.post('/search', async (req: Request, res: Response) => {
   } catch (e) {
     const err = e as ApifyError;
     if (err.name === 'ApifyError') {
-      const status = err.status === 503 ? 503 : 502;
+      const keep = [400, 401, 402, 403, 404, 409, 422, 429];
+      const status = err.status === 503 ? 503 : keep.includes(err.status) ? err.status : 502;
       res.status(status).json({ error: err.message });
       return;
     }

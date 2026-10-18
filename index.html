@@ -222,6 +222,11 @@ button{font-family:inherit;font-size:inherit;cursor:pointer}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
 .chk{display:flex;align-items:center;gap:9px;font-size:14px;cursor:pointer;padding:6px 0}
 .chk input{width:17px;height:17px;accent-color:var(--accent)}
+.selcol{width:38px;text-align:center}
+.selcol input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
+.row-selected{background:var(--accent-tint)}
+.bulkbar{border-color:var(--accent);background:var(--accent-tint)}
+.bulkbar .card-body{padding:12px 16px}
 
 /* ---------- modal / drawer ---------- */
 .overlay{position:fixed;inset:0;background:rgba(15,23,42,.42);backdrop-filter:blur(1px);z-index:80;display:flex;align-items:flex-start;justify-content:center;padding:6vh 20px;overflow:auto;animation:fade var(--t-base) var(--ease)}
@@ -349,6 +354,11 @@ button{font-family:inherit;font-size:inherit;cursor:pointer}
    Multi-desk: Leads · Clientes · Admin. Solo datos reales en memoria (sin demo).
    ========================================================================= */
 
+/* Versión visible de la app. Subir en CADA cambio y mantener sincronizados:
+   APP_VERSION (aquí), VERSION, README.md y server/package.json. */
+const APP_VERSION='1.0.0';
+const APP_RELEASE='18/10/2026';
+
 /* ---------- iconos (familia única, trazo 1.8) ---------- */
 const ICONS = {
   logo:'<path d="M4 7l8-4 8 4-8 4-8-4z"/><path d="M4 12l8 4 8-4"/><path d="M4 17l8 4 8-4"/>',
@@ -383,6 +393,7 @@ const ICONS = {
   play:'<path d="M7 5l12 7-12 7z"/>',
   pause:'<rect x="7" y="5" width="3.5" height="14" rx="1"/><rect x="13.5" y="5" width="3.5" height="14" rx="1"/>',
   download:'<path d="M12 4v11M8 11l4 4 4-4"/><path d="M5 19h14"/>',
+  trash:'<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/>',
   user:'<circle cx="12" cy="8" r="3.6"/><path d="M5 20a7 7 0 0 1 14 0"/>',
   logout:'<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 12H3M7 8l-4 4 4 4"/>',
   briefcase:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12h18"/>',
@@ -488,22 +499,6 @@ function mkLead(o){
   };
   return l;
 }
-function seedTimeline(l){
-  const u=l.asignado_a||'u3';
-  const base=todayShift(-5,10);
-  l.interactions.push({id:uid('i'),user_id:'system',tipo:'estado',resultado:null,nota:'Lead importado desde '+l.fuente+' ('+l.place_id+').',fecha:base});
-  l.interactions.push({id:uid('i'),user_id:u,tipo:'nota',resultado:null,nota:'Ficha revisada. Negocio sin web propia detectado.',fecha:todayShift(-4,11)});
-  if(l.estado==='no_contesta'||l.estado==='callback'||l.estado==='presentado'||l.estado==='potencial'||l.estado==='no_interes'||l.estado==='convertido'){
-    l.calls.push({id:uid('c'),user_id:u,proveedor:'manual',duracion:0,resultado:'no_contactado',grabacion_url:null,fecha:todayShift(-3,12)});
-    l.interactions.push({id:uid('i'),user_id:u,tipo:'llamada',resultado:'no_contactado',nota:'Primera llamada sin respuesta.',fecha:todayShift(-3,12)});
-  }
-  if(l.estado==='presentado'||l.estado==='potencial'||l.estado==='convertido'){
-    l.demos.push({id:uid('d'),tipo:'web',url:'https://demo.digitaliza.es/'+l.nombre.toLowerCase().replace(/[^a-z0-9]+/g,'-'),estado:l.estado==='convertido'?'promovida':'enviada',caduca_en:todayShift(10),visitas:l.estado==='convertido'?14:6,enviada_en:todayShift(-2,16)});
-    l.interactions.push({id:uid('i'),user_id:u,tipo:'email',resultado:null,nota:'Demo web enviada por email.',fecha:todayShift(-2,16)});
-  }
-  if(l.estado==='no_interes') l.interactions.push({id:uid('i'),user_id:u,tipo:'llamada',resultado:'rechazo',nota:'Rechazo: '+(l.motivo_descarte||'No le interesa')+'.',fecha:todayShift(-1,13)});
-  if(l.estado==='convertido') l.interactions.push({id:uid('i'),user_id:u,tipo:'estado',resultado:null,nota:'Convertido a cliente. Traspaso al desk de Clientes.',fecha:todayShift(-1,17)});
-}
 (function seed(){
   /* Datos de demostracion desactivados: la plataforma arranca en vacio.
      Solo se muestran datos reales, que llegan del motor de busqueda (Apify),
@@ -511,7 +506,7 @@ function seedTimeline(l){
 })();
 
 /* ---------- sesión ---------- */
-const S={user:null,route:'#/login',tabs:{},filters:{},searchOpen:false,aiOpen:false,aiMsgs:[],aiCtx:null,job:null,listQuery:''};
+const S={user:null,route:'#/login',tabs:{},filters:{},searchOpen:false,aiOpen:false,aiMsgs:[],aiCtx:null,job:null,listQuery:'',leadSel:{}};
 function userById(id){return DB.users.find(u=>u.id===id)||{nombre:'Sistema',iniciales:'SY'};}
 function leadById(id){return DB.leads.find(l=>l.id===id);}
 function customerById(id){return DB.customers.find(c=>c.id===id);}
@@ -525,10 +520,40 @@ function visibleLeads(){
 function canSeeClients(){return S.user&&(S.user.rol==='admin'||S.user.rol==='soporte');}
 function canSeeLeads(){return S.user&&S.user.rol!=='soporte';}
 function isAdmin(){return S.user&&S.user.rol==='admin';}
+function leadSelIds(){
+  const m=S.leadSel||{};
+  return Object.keys(m).filter(function(id){return m[id]&&leadById(id);});
+}
+function clearLeadSel(){S.leadSel={};}
+function selectAllVisible(on){
+  S.leadSel={};
+  if(on)document.querySelectorAll('[data-lead-row]').forEach(function(tr){S.leadSel[tr.getAttribute('data-lead-row')]=1;});
+  paintLeadSel();
+}
+function paintLeadSel(){
+  const ids=leadSelIds();const n=ids.length;
+  const rows=document.querySelectorAll('[data-lead-row]');
+  rows.forEach(function(tr){
+    const id=tr.getAttribute('data-lead-row');const on=!!(S.leadSel||{})[id];
+    tr.classList.toggle('row-selected',on);
+    const cb=tr.querySelector('[data-select]');if(cb)cb.checked=on;
+  });
+  const all=document.getElementById('selAll');
+  if(all){all.checked=rows.length>0&&n===rows.length;all.indeterminate=n>0&&n<rows.length;}
+  const bar=document.getElementById('bulkBar');if(bar)bar.style.display=n?'':'none';
+  const cnt=document.getElementById('bulkCount');if(cnt)cnt.textContent=n;
+  const sb=document.getElementById('selectAllBtn');
+  if(sb){const allOn=rows.length>0&&n===rows.length;sb.innerHTML=icon(allOn?'x':'check','sm')+' '+(allOn?'Quitar selección':'Seleccionar visibles');}
+  const nc=document.getElementById('bulkNoContact');
+  if(nc){
+    const blocked=n>0&&ids.every(function(id){const l=leadById(id);return l&&l.no_contactar;});
+    nc.innerHTML=icon(blocked?'check':'phone','sm')+' '+(blocked?'Permitir contacto':'No contactar');
+  }
+}
 
 /* ---------- navegación ---------- */
-function go(h){S.searchOpen=false;S.route=h;try{if(location.hash!==h)location.hash=h;}catch(e){}render();}
-window.addEventListener('hashchange',()=>{const h=location.hash||'#/login';if(h!==S.route){S.route=h;render();}});
+function go(h){if(h!==S.route)S.leadSel={};S.searchOpen=false;S.route=h;try{if(location.hash!==h)location.hash=h;}catch(e){}render();}
+window.addEventListener('hashchange',()=>{const h=location.hash||'#/login';if(h!==S.route){S.route=h;S.leadSel={};render();}});
 
 /* ---------- primitivos UI ---------- */
 function stPill(e){return '<span class="stpill st-'+e+'">'+ESTADOS[e].label+'</span>';}
@@ -594,7 +619,7 @@ function viewLogin(){
           '<div class="login-feat"><span class="dot">'+icon('layers','sm')+'</span> Traspaso automático Lead → Cliente con historial</div>'+
         '</div>'+
       '</div>'+
-      '<div class="tiny" style="color:#7C879A">Prototipo Fase 1 (MVP) · Solo datos reales · RGPD / Lista Robinson reflejados en la interfaz</div>'+
+      '<div class="tiny" style="color:#7C879A">Prototipo Fase 1 (MVP) · versión '+esc(APP_VERSION)+' ('+esc(APP_RELEASE)+') · Solo datos reales · RGPD / Lista Robinson reflejados en la interfaz</div>'+
     '</div>'+
     '<div class="login-panel"><div class="login-card">'+
       '<h2>Inicia sesión</h2>'+
@@ -669,6 +694,7 @@ function viewShell(){
         '<div class="row gap8" style="padding:6px 8px"><span class="avatar lg" style="background:rgba(255,255,255,.08);color:#fff;border-color:transparent">'+esc(S.user.iniciales)+'</span>'+
           '<span class="fill"><span style="color:#fff;font-weight:600;font-size:13.5px;display:block">'+esc(S.user.nombre)+'</span><span class="tiny" style="color:#7C879A">'+ROL_LABEL[S.user.rol]+'</span></span>'+
           '<button class="iconbtn" id="logout" title="Salir" style="color:#9AA5B4">'+icon('logout','sm')+'</button></div>'+
+        '<div class="row" style="padding:8px 8px 2px;display:flex;justify-content:space-between;align-items:center"><span class="tiny mono" style="color:#6B7688">versión '+esc(APP_VERSION)+'</span><span class="tiny" style="color:#6B7688">'+esc(APP_RELEASE)+'</span></div>'+
       '</div>'+
     '</aside>'+
     '<div class="main">'+viewTopbar()+viewRoute()+'</div>'+
@@ -694,11 +720,13 @@ function viewTopbar(){
   let c=cfg[S.route];
   if(!c){if(S.route.indexOf('#/leads/')===0)c=['Desk Leads','Ficha de lead'];else if(S.route.indexOf('#/clients/')===0)c=['Desk Clientes','Ficha de cliente'];else c=['','']; }
   const nc=notifCount();
+  const am=apifyStateMeta();
+  const amLabel=am.label==='Conectado'?'Apify conectado':(am.label==='Sin verificar'?'Apify sin verificar':am.label);
   return '<header class="topbar">'+
     '<button class="iconbtn" id="navToggle" style="display:none" aria-label="Menú">'+icon('grid')+'</button>'+
     '<div class="crumb">'+esc(c[0])+' / <b>'+esc(c[1])+'</b></div>'+
     '<div class="fill"></div>'+
-    '<span class="badge" style="background:'+(sourceReady()?'var(--ok-tint)':'var(--warn-tint)')+';color:'+(sourceReady()?'var(--ok)':'var(--warn)')+'" title="'+(sourceReady()?'Fuente conectada: los leads provienen de datos reales de Google Maps.':'Conecta tu API de Apify (o el backend) en Administración → Configuración para obtener datos reales.')+'">'+icon('plug','sm')+' '+(sourceReady()?'Datos reales (Apify)':'Sin fuente conectada')+'</span>'+
+    '<span class="badge" style="background:'+am.bg+';color:'+am.fg+'" title="'+(am.label==='Conectado'?'Token validado: las búsquedas traen datos reales de Google Maps.':'Configura y valida la conexión en Administración → Configuración.')+'">'+icon('plug','sm')+' '+amLabel+'</span>'+
     '<div class="searchbox">'+icon('search','sm')+'<input id="globalSearch" placeholder="Buscar lead, cliente o teléfono…" value="'+esc(S.listQuery)+'" aria-label="Búsqueda global"></div>'+
     '<button class="iconbtn" data-notif aria-label="Notificaciones" style="position:relative">'+icon('bell')+(nc?'<span style="position:absolute;top:-4px;right:-4px;background:var(--danger);color:#fff;border-radius:999px;font-size:10px;line-height:1;padding:3px 5px;font-weight:600">'+nc+'</span>':'')+'</button>'+
     '<button class="btn outline" id="openAI">'+icon('sparkles','sm')+' Asistente IA</button>'+
@@ -729,7 +757,7 @@ function mountShell(){
   const lo=$('#logout');if(lo)lo.addEventListener('click',()=>{cancelJob();S.user=null;S.aiOpen=false;S.aiMsgs=[];go('#/login');render();});
   const tg=$('#navToggle');if(tg){tg.style.display=window.innerWidth<=960?'inline-flex':'none';tg.addEventListener('click',()=>document.body.classList.toggle('nav-open'));}
   const ai=$('#openAI');if(ai)ai.addEventListener('click',()=>{S.aiOpen=true;mountAI();});
-  const gs=$('#globalSearch');if(gs)gs.addEventListener('input',e=>{S.listQuery=e.target.value;if(S.route!=='#/leads'&&S.route!=='#/clients'){location.hash='#/leads';}else{render();const ns=$('#globalSearch');if(ns){ns.focus();ns.setSelectionRange(ns.value.length,ns.value.length);}}});
+  const gs=$('#globalSearch');if(gs)gs.addEventListener('input',e=>{S.listQuery=e.target.value;if(S.route==='#/leads')clearLeadSel();if(S.route!=='#/leads'&&S.route!=='#/clients'){location.hash='#/leads';}else{render();const ns=$('#globalSearch');if(ns){ns.focus();ns.setSelectionRange(ns.value.length,ns.value.length);}}});
 }
 
 /* =========================================================================
@@ -790,19 +818,30 @@ function viewLeadList(){
   else if(wf==='con_web')leads=leads.filter(l=>l.web_tipo==='propia');
   if(q)leads=leads.filter(l=>l.nombre.toLowerCase().includes(q)||l.sector.toLowerCase().includes(q)||l.ciudad.toLowerCase().includes(q)||l.telefono.includes(q));
   leads.sort((a,b)=>b.score-a.score);
+  const selCount=leadSelIds().length;
+  const allSel=leads.length>0&&leads.every(function(l){return !!(S.leadSel||{})[l.id];});
   const all=visibleLeads();
   const counts=ESTADOS_LEAD.reduce((m,e)=>{m[e]=all.filter(l=>l.estado===e).length;return m;},{});
   const wCounts={sin_web:all.filter(l=>!l.web_tipo).length,solo_redes:all.filter(l=>l.web_tipo&&l.web_tipo!=='propia').length,con_web:all.filter(l=>l.web_tipo==='propia').length};
   return '<div class="page-head"><div><h1>Leads</h1><div class="page-sub">'+leads.length+' registros en tu ámbito · ordenados por lead score</div></div>'+
-    '<div class="row gap8">'+(isAdmin()?('<button class="btn outline" data-bulkassign>'+icon('users','sm')+' Asignar a comercial</button>'):'')+'<button class="btn outline" id="exportLeads">'+icon('download','sm')+' Exportar CSV</button>'+(isAdmin()?('<button class="btn primary" data-go="#/leads/search">'+icon('plus','sm')+' Buscar nuevos</button>'):'')+'</div></div>'+
+    '<div class="row gap8">'+(canReassign()?('<button class="btn outline" data-bulkassign>'+icon('users','sm')+' Asignar a comercial</button>'):'')+'<button class="btn ghost" id="selectAllBtn">'+icon('check','sm')+' Seleccionar visibles</button><button class="btn outline" id="exportLeads">'+icon('download','sm')+' Exportar CSV</button>'+(isAdmin()?('<button class="btn primary" data-go="#/leads/search">'+icon('plus','sm')+' Buscar nuevos</button>'):'')+'</div></div>'+
   '<div class="chipbar mb8"><button class="pill-btn '+(f==='todos'?'on':'')+'" data-filter="todos">Todos · '+all.length+'</button>'+
     ESTADOS_LEAD.map(e=>counts[e]?'<button class="pill-btn '+(f===e?'on':'')+'" data-filter="'+e+'">'+ESTADOS[e].label+' · '+counts[e]+'</button>':'').join('')+'</div>'+
   '<div class="chipbar mb16"><span class="tiny muted" style="align-self:center;margin-right:4px">Presencia online:</span><button class="pill-btn '+(wf==='todos'?'on':'')+'" data-webfilter="todos">Toda · '+all.length+'</button>'+
     '<button class="pill-btn '+(wf==='sin_web'?'on':'')+'" data-webfilter="sin_web">'+icon('globe','sm')+' Sin web · '+wCounts.sin_web+'</button>'+
     '<button class="pill-btn '+(wf==='solo_redes'?'on':'')+'" data-webfilter="solo_redes">'+icon('instagram','sm')+' Solo redes · '+wCounts.solo_redes+'</button>'+
     (wCounts.con_web?'<button class="pill-btn '+(wf==='con_web'?'on':'')+'" data-webfilter="con_web">Con web · '+wCounts.con_web+'</button>':'')+'</div>'+
-  '<div class="card tbl-wrap">'+(leads.length?'<table class="table"><thead><tr><th></th><th>Negocio</th><th>Sector</th><th>Ciudad</th><th>Web</th><th>Reputación</th><th>Estado</th><th>Asignado</th><th>Próxima</th></tr></thead><tbody>'+
-    leads.map(l=>'<tr class="clickable" data-go="#/leads/'+l.id+'">'+
+  '<div class="card bulkbar mb16" id="bulkBar" style="display:'+(selCount?'':'none')+'"><div class="card-body"><div class="row gap8 wrap"><b><span id="bulkCount">'+selCount+'</span> seleccionados</b><span class="fill"></span>'+
+    (canReassign()?'<button class="btn outline sm" id="bulkAssign">'+icon('users','sm')+' Asignar</button>':'')+
+    '<button class="btn outline sm" id="bulkStatus">'+icon('check','sm')+' Cambiar estado</button>'+
+    '<button class="btn outline sm" id="bulkNoContact">'+icon('phone','sm')+' No contactar</button>'+
+    '<button class="btn outline sm" id="bulkExport">'+icon('download','sm')+' Exportar</button>'+
+    (isAdmin()?'<button class="btn ghost sm" id="bulkDelete" style="color:var(--danger)">'+icon('trash','sm')+' Eliminar</button>':'')+
+    '<button class="btn ghost sm" id="bulkClear">'+icon('x','sm')+' Quitar selección</button>'+
+  '</div></div></div>'+
+  '<div class="card tbl-wrap">'+(leads.length?'<table class="table"><thead><tr><th class="selcol"><input type="checkbox" id="selAll" aria-label="Seleccionar todos los leads visibles"'+(allSel?' checked':'')+'></th><th></th><th>Negocio</th><th>Sector</th><th>Ciudad</th><th>Web</th><th>Reputación</th><th>Estado</th><th>Asignado</th><th>Próxima</th></tr></thead><tbody>'+
+    leads.map(l=>'<tr class="clickable" data-lead-row="'+l.id+'" data-go="#/leads/'+l.id+'">'+
+      '<td class="selcol"><input type="checkbox" data-select="'+l.id+'" aria-label="Seleccionar '+esc(l.nombre)+'"'+((S.leadSel||{})[l.id]?' checked':'')+'></td>'+
       '<td>'+scoreBadge(l.score)+'</td>'+
       '<td><div class="lead-name">'+esc(l.nombre)+'</div><div class="lead-sub mono">'+esc(l.place_id)+'</div></td>'+
       '<td class="small">'+esc(l.sector)+'</td>'+
@@ -815,37 +854,58 @@ function viewLeadList(){
     '</tr>').join('')+'</tbody></table>':'<div class="empty">'+icon('filter','lg')+'<p>No hay leads que coincidan con este filtro.</p>'+(S.user.rol==='comercial'?'<p class="small muted">El administrador te irá asignando leads a tu portafolio.</p>':'')+'</div>')+'</div>';
 }
 
+function searchStatusBadge(s){
+  const st=s&&s.estado;
+  if(st==='completada'||st==='convertido')return '<span class="badge" style="background:var(--ok-tint);color:var(--ok)">Completada</span>';
+  if(st==='pausada'||st==='interrumpida')return '<span class="badge" style="background:var(--warn-tint);color:var(--warn)">'+esc(st==='pausada'?'Pausada':'Interrumpida')+'</span>';
+  return '<span class="badge">'+esc(st||'—')+'</span>';
+}
 function viewSearch(){
   const hist=DB.searches.slice().sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
-  return '<div class="page-head"><div><h1>Motor de búsqueda</h1><div class="page-sub">Solo negocios de España <b>sin web propia</b> (sin web o solo con redes): los leads con poca presencia online, por sector y zona.</div></div></div>'+
+  const st=settings();
+  const sm=apifyStateMeta();
+  const stateNote=(sm.label==='Conectado')
+    ? '<div class="notice mb16" style="border-color:var(--ok)">'+icon('check','sm')+'<span class="small"><b>Apify conectado.</b> Las búsquedas usan datos reales de Google Maps y solo importan negocios sin web propia.</span></div>'
+    : '<div class="notice mb16" style="border-color:var(--warn)">'+icon('alert','sm')+'<span class="small"><b>'+sm.label+'.</b> Configura y valida el token en <a href="#/admin/settings">Administración → Configuración</a>. Sin fuente no se generan leads de prueba.</span></div>';
+  return '<div class="page-head"><div><h1>Motor de búsqueda</h1><div class="page-sub">Busca por <b>palabras clave</b> cualquier sector o servicio en España, solo negocios <b>sin web propia</b> (sin web o solo con redes).</div></div><span class="badge" style="background:'+sm.bg+';color:'+sm.fg+'">'+icon('plug','sm')+' '+sm.label+'</span></div>'+
+  stateNote+
   '<div class="cols-2">'+
-    '<div class="card"><div class="card-head"><h3>Nueva búsqueda</h3><span class="fill"></span><span class="badge" style="'+(srcIsApify()&&sourceReady()?'background:var(--ok-tint);color:var(--ok)':'')+'">'+icon('plug','sm')+' '+esc(activeSourceLabel())+(srcIsApify()?(sourceReady()?' · conectado':' · sin fuente'):'')+'</span></div><div class="card-body">'+
+    '<div class="card"><div class="card-head"><h3>Nueva búsqueda</h3><span class="fill"></span><span class="badge" style="'+(sm.label==='Conectado'?'background:var(--ok-tint);color:var(--ok)':'')+'">'+icon('plug','sm')+' '+esc(activeSourceLabel())+(srcIsApify()?(sm.label==='Conectado'?' · conectado':' · '+sm.label.toLowerCase()):'')+'</span></div><div class="card-body">'+
       '<div class="form-grid">'+
-        field('Sector o categoría','<input class="input" id="fSector" placeholder="Ej. Clínica dental" list="sectores"><datalist id="sectores">'+Object.keys(SECTOR_META).map(s=>'<option>'+s+'</option>').join('')+'</datalist>')+
+        field('Palabras clave','<input class="input" id="fSector" placeholder="Ej. clínica dental, cerrajero 24h, gestoría…">','Texto libre: no hay lista cerrada. Escribe el sector, servicio o necesidad y el motor lo busca tal cual en Google Maps.')+
         field('Zona','<input class="input" id="fZona" placeholder="Ciudad, provincia o vacío = toda España">')+
         field('Radio (km, 0 = sin límite)','<input class="input" id="fRadio" type="number" min="0" value="15">')+
-        field('Máx. resultados (total)','<input class="input" id="fMax" type="number" min="1" value="60">')+
+        field('Máx. resultados (total)','<input class="input" id="fMax" type="number" min="1" max="120" value="60">')+
         field('Cobertura','<select class="select" id="fCobertura"><option value="auto">Automática (zona vacía = todas las provincias)</option><option value="zona">Solo la zona indicada</option><option value="provincias">Toda España por provincias (52 celdas)</option></select>')+
       '</div>'+
-      '<p class="small muted mt8" style="margin-bottom:0">'+icon('info','sm')+' Cobertura por provincias: se lanza una consulta por cada una de las 52 provincias y se reparte el máximo total entre ellas (pausable y cancelable). Cada consulta consume créditos de Apify.</p>'+
+      '<p class="small muted mt8" style="margin-bottom:0">'+icon('info','sm')+' Cobertura por provincias: una consulta por cada una de las 52 provincias, repartiendo el máximo total. Es pausable y cancelable, pero consume créditos de Apify y puede tardar. Empieza con una ciudad y 10 resultados.</p>'+
       field('Filtro de contacto','<select class="select" id="fContacto"><option value="cualquiera">Cualquiera</option><option value="tel">Solo con teléfono</option><option value="tel-email">Teléfono + email</option></select>')+
-      '<div class="notice" style="border-color:var(--accent)">'+icon('filter','sm')+'<span class="small">Regla fija del desk de captación: se devuelven <b>solo negocios sin web propia</b> (sin web o solo con redes sociales) y ubicados en <b>España</b>. Los que ya tienen web se descartan.</span></div>'+
+      '<div class="notice" style="border-color:var(--accent)">'+icon('filter','sm')+'<span class="small">Regla fija: se piden a Google Maps <b>solo negocios sin web propia</b> (<span class="mono">website: withoutWebsite</span>), en <b>España</b>. Se aceptan los que solo tienen redes sociales y se descartan los que ya tienen web.</span></div>'+
       '<label class="chk"><input type="checkbox" id="fProgramar"> Programar como búsqueda recurrente mensual</label>'+
-      '<div class="row gap8 mt16"><button class="btn primary" id="runSearch">'+icon('play','sm')+' Ejecutar búsqueda</button><button class="btn ghost" id="resetSearch">Limpiar</button></div>'+
+      '<div class="row gap8 mt16 wrap"><button class="btn primary" id="runSearch">'+icon('play','sm')+' Ejecutar búsqueda</button><button class="btn outline" id="quickSearch" title="Fija 10 resultados y la zona indicada para gastar pocos créditos">'+icon('target','sm')+' Prueba (10)</button><button class="btn ghost" id="resetSearch">Limpiar</button></div>'+
     '</div></div>'+
     '<div class="card"><div class="card-head"><h3>Arquitectura de fuentes</h3></div><div class="card-body"><p class="small muted" style="margin-top:0">Interfaz de adaptadores común <span class="mono">search()</span> / <span class="mono">getDetails()</span>. Cambiar de proveedor no toca el resto del sistema.</p>'+
-      '<ul class="list-plain">'+FUENTES.map((f,i)=>{const on=i===settings().fuente;const isAp=f==='Apify';return '<li><span class="avatar" style="background:'+(on?'var(--accent-tint)':'var(--surface-3)')+';color:'+(on?'var(--accent)':'var(--muted)')+'">'+icon(on?'check':'plug','sm')+'</span><span class="fill small">'+esc(f)+(isAp&&sourceReady()?' <span class="tag mono tiny" style="color:var(--ok)">token ok</span>':'')+'</span>'+(on?'<span class="badge" style="background:var(--ok-tint);color:var(--ok)">Activo</span>':'<span class="badge">Disponible</span>')+'</li>';}).join('')+'</ul>'+
-      (srcIsApify()?(sourceReady()?'<div class="notice mt16" style="border-color:var(--ok)">'+icon('check','sm')+'<span class="small">Apify conectado'+(backendConfigured()?' vía backend <span class="mono">'+esc(apiBase())+'</span> (el token vive en el servidor)':' con el actor <span class="mono">'+esc(apifySettings().apifyActor)+'</span>; el token solo vive en este navegador')+'. La búsqueda traerá datos reales de Google Maps.</span></div>':'<div class="notice mt16" style="border-color:var(--warn)">'+icon('alert','sm')+'<span class="small">Apify seleccionado pero <b>sin fuente</b>. Pega tu token o configura el backend en Administración → Configuración; el modo demo está desactivado: no se generarán datos de prueba hasta conectarlo.</span></div>'):'')+
+      '<ul class="list-plain">'+FUENTES.map((f,i)=>{const on=i===st.fuente;const isAp=f==='Apify';return '<li><span class="avatar" style="background:'+(on?'var(--accent-tint)':'var(--surface-3)')+';color:'+(on?'var(--accent)':'var(--muted)')+'">'+icon(on?'check':'plug','sm')+'</span><span class="fill small">'+esc(f)+(isAp&&st.apifyOk?' <span class="tag mono tiny" style="color:var(--ok)">validado</span>':'')+'</span>'+(on?'<span class="badge" style="background:var(--ok-tint);color:var(--ok)">Activo</span>':'<span class="badge">Disponible</span>')+'</li>';}).join('')+'</ul>'+
+      (srcIsApify()?(st.apifyOk?'<div class="notice mt16" style="border-color:var(--ok)">'+icon('check','sm')+'<span class="small">Apify validado'+(backendConfigured()?' vía backend <span class="mono">'+esc(apiBase())+'</span> (el token vive en el servidor)':' con el actor <span class="mono">'+esc(st.apifyActor)+'</span>; el token solo vive en este navegador')+'. La búsqueda trae datos reales de Google Maps.</span></div>':'<div class="notice mt16" style="border-color:var(--warn)">'+icon('alert','sm')+'<span class="small">Apify configurado pero <b>sin validar</b>. Pulsa «Probar conexión» en <a href="#/admin/settings">Configuración</a>. Sin token válido no se generan leads.</span></div>'):'')+
       '<div class="notice mt16">'+icon('shield','sm')+'<span class="small">Solo se guarda <span class="mono">place_id</span> de forma permanente; el resto de datos en caché temporal (~30 días), según los términos de Google.</span></div>'+
     '</div></div>'+
   '</div>'+
   '<div class="card mt16" id="jobPanel" style="display:none"><div class="card-head"><h3 id="jobTitle">Trabajo en curso</h3><span class="fill"></span><span class="badge" id="jobBadge">0%</span></div><div class="card-body">'+
     '<div class="progress mb16"><i id="jobBar" style="width:0%"></i></div>'+
-    '<div class="row gap24 small muted"><span id="jobCell">Celda 0/0</span><span id="jobFound">Leads nuevos: 0</span><span id="jobDup">Duplicados: 0</span></div>'+
+    '<div class="row gap24 small muted"><span id="jobCell">Celda 0/0</span><span id="jobFound">Leads importados: 0</span><span id="jobDup">Descartados: 0</span></div>'+
+    '<div class="tiny muted mt8" id="jobBreakdown"></div>'+
+    '<div id="jobErrors"></div>'+
     '<div class="row gap8 mt16"><button class="btn outline" id="jobPause">'+icon('pause','sm')+' Pausar</button><button class="btn ghost" id="jobCancel">Cancelar</button></div>'+
   '</div></div>'+
-  '<div class="card mt16"><div class="card-head"><h3>Historial de búsquedas</h3></div><div class="tbl-wrap"><table class="table"><thead><tr><th>Sector</th><th>Zona</th><th>Lanzada por</th><th>Fecha</th><th>Resultados</th><th>Nuevos</th><th>Duplicados</th><th>Estado</th></tr></thead><tbody>'+
-    hist.map(s=>'<tr><td class="strong">'+esc(s.sector)+'</td><td class="small">'+esc(s.zona||'Toda España')+'</td><td class="small">'+esc(userById(s.user_id).nombre)+'</td><td class="small">'+fmtDate(s.fecha)+'</td><td class="mono tiny">'+s.resultados+'</td><td class="mono tiny" style="color:var(--ok)">+'+s.nuevos+'</td><td class="mono tiny muted">'+s.duplicados+'</td><td>'+(s.programada?'<span class="badge" style="background:var(--accent-tint);color:var(--accent)">'+s.programada+'</span> ':'')+(s.estado==='completada'?stPill('convertido'):'<span class="badge" style="background:var(--warn-tint);color:var(--warn)">Pausada</span>')+'</td></tr>').join('')+
+  '<div class="card mt16"><div class="card-head">'+icon('layers','sm')+'<h3>Importar dataset de Apify</h3><span class="fill"></span><span class="badge">Sin token</span></div><div class="card-body">'+
+    '<p class="small muted" style="margin-top:0">Si ya lanzaste el actor en Apify, exporta el dataset en JSON y pégalo aquí (array o JSONL). Se aplican los mismos filtros: España, sin web propia y sin duplicados.</p>'+
+    '<div class="field"><label for="dsJson">Dataset JSON</label><textarea class="textarea mono" id="dsJson" rows="5" placeholder=\'[{"title":"Clínica Ejemplo","website":"","address":"Calle Mayor 1, Madrid","phone":"910 000 000"}]\'></textarea></div>'+
+    '<div class="row gap8 mt8 wrap"><input class="input" id="dsFile" type="file" accept=".json,.jsonl,application/json" style="max-width:260px" aria-label="Archivo JSON del dataset"><button class="btn primary" id="importDataset">'+icon('check','sm')+' Importar dataset</button></div>'+
+    '<div class="small mt8" id="dsResult"></div>'+
+    '<div class="notice mt16">'+icon('info','sm')+'<span class="small">Se reconocen los campos de Apify: <span class="mono">title</span>, <span class="mono">website</span>, <span class="mono">phone</span>, <span class="mono">address</span>, <span class="mono">totalScore</span> y <span class="mono">reviewsCount</span>.</span></div>'+
+  '</div></div>'+
+  '<div class="card mt16"><div class="card-head"><h3>Historial de búsquedas</h3></div><div class="tbl-wrap"><table class="table"><thead><tr><th>Palabras clave</th><th>Zona</th><th>Lanzada por</th><th>Fecha</th><th>Resultados</th><th>Nuevos</th><th>Duplicados</th><th>Estado</th></tr></thead><tbody>'+
+    hist.map(s=>'<tr><td class="strong">'+esc(s.sector)+'</td><td class="small">'+esc(s.zona||'Toda España')+'</td><td class="small">'+esc(userById(s.user_id).nombre)+'</td><td class="small">'+fmtDate(s.fecha)+'</td><td class="mono tiny">'+s.resultados+'</td><td class="mono tiny" style="color:var(--ok)">+'+s.nuevos+'</td><td class="mono tiny muted">'+s.duplicados+'</td><td>'+(s.programada?'<span class="badge" style="background:var(--accent-tint);color:var(--accent)">'+s.programada+'</span> ':'')+searchStatusBadge(s)+'</td></tr>').join('')+
   '</tbody></table></div></div>';
 }
 
@@ -1129,24 +1189,29 @@ function viewAdminUsers(){
 function viewAdminSearches(){
   const hist=DB.searches.slice().sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
   return '<div class="page-head"><div><h1>Búsquedas</h1><div class="page-sub">Historial de trabajos, resultados y búsquedas programadas</div></div></div>'+
-  '<div class="card tbl-wrap"><table class="table"><thead><tr><th>Sector</th><th>Zona</th><th>Usuario</th><th>Fecha</th><th>Resultados</th><th>Nuevos</th><th>Duplicados</th><th>Programada</th><th>Estado</th></tr></thead><tbody>'+
-    hist.map(s=>'<tr><td class="strong">'+esc(s.sector)+'</td><td class="small">'+esc(s.zona||'Toda España')+'</td><td class="small">'+esc(userById(s.user_id).nombre)+'</td><td class="small">'+fmtDate(s.fecha)+'</td><td class="mono tiny">'+s.resultados+'</td><td class="mono tiny" style="color:var(--ok)">+'+s.nuevos+'</td><td class="mono tiny muted">'+s.duplicados+'</td><td>'+(s.programada?'<span class="badge" style="background:var(--accent-tint);color:var(--accent)">'+s.programada+'</span>':'<span class="muted small">—</span>')+'</td><td class="small">'+esc(s.estado)+'</td></tr>').join('')+
+  '<div class="card tbl-wrap"><table class="table"><thead><tr><th>Palabras clave</th><th>Zona</th><th>Usuario</th><th>Fecha</th><th>Resultados</th><th>Nuevos</th><th>Duplicados</th><th>Programada</th><th>Estado</th></tr></thead><tbody>'+
+    hist.map(s=>'<tr><td class="strong">'+esc(s.sector)+'</td><td class="small">'+esc(s.zona||'Toda España')+'</td><td class="small">'+esc(userById(s.user_id).nombre)+'</td><td class="small">'+fmtDate(s.fecha)+'</td><td class="mono tiny">'+s.resultados+'</td><td class="mono tiny" style="color:var(--ok)">+'+s.nuevos+'</td><td class="mono tiny muted">'+s.duplicados+'</td><td>'+(s.programada?'<span class="badge" style="background:var(--accent-tint);color:var(--accent)">'+s.programada+'</span>':'<span class="muted small">—</span>')+'</td><td class="small">'+searchStatusBadge(s)+'</td></tr>').join('')+
   '</tbody></table></div>';
 }
 function viewAdminSettings(){
   const st=settings();
-  const conectado=apifyConfigured()||backendConfigured();
-  return '<div class="page-head"><div><h1>Configuración</h1><div class="page-sub">Fuentes de datos, telefonía, cumplimiento legal y campos del modelo</div></div><span class="badge" style="background:'+(conectado?'var(--ok-tint)':'var(--warn-tint)')+';color:'+(conectado?'var(--ok)':'var(--warn)')+'">'+icon('plug','sm')+' '+(conectado?'Apify conectado':'Sin fuente conectada')+'</span></div>'+
+  const sm=apifyStateMeta();
+  const checked=st.apifyCheckedAt?('Última comprobación: '+fmtDateTime(st.apifyCheckedAt)+(st.apifyDetail?(' · '+esc(st.apifyDetail)):'')):'Aún sin comprobar.';
+  return '<div class="page-head"><div><h1>Configuración</h1><div class="page-sub">Fuentes de datos, conexión con Google Maps, telefonía y cumplimiento · <b>versión '+esc(APP_VERSION)+'</b> ('+esc(APP_RELEASE)+')</div></div><span class="badge" style="background:'+sm.bg+';color:'+sm.fg+'">'+icon('plug','sm')+' '+sm.label+'</span></div>'+
   '<div class="cols-2">'+
     '<div class="stack gap16">'+
-      card2('Fuentes de datos', 'plug', '<p class="small muted" style="margin-top:0">Adaptador principal activo. Pulsa para cambiarlo (interfaz de adaptadores común).</p>'+FUENTES.map((f,i)=>'<button class="row gap12" data-source="'+i+'" style="width:100%;text-align:left;background:none;border:none;border-bottom:1px solid var(--border);padding:9px 0;cursor:pointer"><span class="fill">'+esc(f)+'</span>'+(i===st.fuente?'<span class="badge" style="background:var(--ok-tint);color:var(--ok)">Principal</span>':'<span class="badge">Usar</span>')+'</button>').join('')+
-        '<div class="notice mt16" style="border-color:'+(backendConfigured()?'var(--ok)':(apifyConfigured()?'var(--ok)':'var(--border-2)'))+'">'+icon('plug','sm')+'<span class="small"><b>Backend</b> · '+(backendConfigured()?('conectado a <span class="mono">'+esc(apiBase())+'</span>. El token de Apify vive en el servidor.'):'sin URL: el navegador llama a Apify directamente con el token de abajo.')+'</span></div>'+
-        field('Backend / API URL','<input class="input" id="apiBase" placeholder="https://tu-app.up.railway.app" value="'+esc(st.apiBase||'')+'">','Si la rellenas, las búsquedas se envían al backend (recomendado en producción). Déjala vacía para usar el token del navegador.')+
-        '<div class="row gap8 mt8"><button class="btn primary" id="apiSave">'+icon('check','sm')+' Guardar backend</button><button class="btn ghost" id="apiClear">Quitar backend</button></div>'+
-        '<div class="notice mt16" style="border-color:'+(apifyConfigured()?'var(--ok)':'var(--border-2)')+'">'+icon('plug','sm')+'<span class="small"><b>Apify</b> · '+(apifyConfigured()?'token configurado en este navegador.':'sin token: pega tu API token (o usa el backend) para activar la búsqueda real.')+'</span></div>'+
-        field('Apify API token','<input class="input" id="apifyToken" type="password" autocomplete="off" placeholder="apify_api_…" value="'+esc(st.apifyToken||'')+'">','Se guarda solo en este navegador (localStorage); nunca en el archivo ni en la auditoría. Con backend configurado puede dejarse vacío.')+
-        field('Apify actor','<input class="input" id="apifyActor" placeholder="'+APIFY_DEFAULT_ACTOR+'" value="'+esc(st.apifyActor||APIFY_DEFAULT_ACTOR)+'">')+
-        '<div class="row gap8 mt8"><button class="btn primary" id="apifySave">'+icon('check','sm')+' Guardar y conectar</button><button class="btn ghost" id="apifyClear">Quitar token</button></div>')+
+      card2('Conexión Google Maps (Apify)', 'plug', '<div class="row gap8 wrap mb8"><span id="apifyState" class="badge" style="background:'+sm.bg+';color:'+sm.fg+'">'+sm.label+'</span><span class="fill"></span><button class="btn outline sm" id="apifyTest">'+icon('plug','sm')+' Probar conexión</button></div>'+
+        '<div class="tiny muted mb16" id="apifyDetail">'+checked+'</div>'+
+        '<p class="small muted" style="margin-top:0">Busca negocios en Google Maps y tráelos como leads. El filtro fijo es <b>sin web propia</b>: sin web o solo con redes sociales.</p>'+
+        field('Apify API token','<input class="input" id="apifyToken" type="password" autocomplete="off" placeholder="apify_api_…" value="'+esc(st.apifyToken||'')+'">','Se guarda solo en este navegador (localStorage); nunca en el archivo, el repositorio ni la auditoría. Con backend configurado puede dejarse vacío.')+
+        field('Apify actor','<input class="input" id="apifyActor" placeholder="'+APIFY_DEFAULT_ACTOR+'" value="'+esc(st.apifyActor||APIFY_DEFAULT_ACTOR)+'">','Por defecto <span class="mono">compass/crawler-google-places</span>. Se le envía el filtro <span class="mono">website: withoutWebsite</span> y país <span class="mono">ES</span>.')+
+        '<div class="row gap8 mt8 wrap"><button class="btn primary" id="apifySave">'+icon('check','sm')+' Guardar token</button><button class="btn ghost" id="apifyClear">Quitar token</button></div>'+
+        '<div class="notice mt16">'+icon('shield','sm')+'<span class="small">El token no se escribe en <span class="mono">index.html</span> ni se incluye en el CSV exportado. En producción, mejor en <span class="mono">APIFY_TOKEN</span> del servidor.</span></div>'+
+        '<p class="tiny muted mt8" style="margin-bottom:0">Consigue un token en <a href="https://console.apify.com/account/integrations" target="_blank" rel="noopener">Apify Console → Integrations</a>.</p>')+
+      card2('Backend y fuente de datos', 'layers', '<p class="small muted" style="margin-top:0">Adaptador principal activo. Pulsa para cambiarlo (interfaz de adaptadores común).</p>'+FUENTES.map((f,i)=>'<button class="row gap12" data-source="'+i+'" style="width:100%;text-align:left;background:none;border:none;border-bottom:1px solid var(--border);padding:9px 0;cursor:pointer"><span class="fill">'+esc(f)+'</span>'+(i===st.fuente?'<span class="badge" style="background:var(--ok-tint);color:var(--ok)">Principal</span>':'<span class="badge">Usar</span>')+'</button>').join('')+
+        '<div class="notice mt16" style="border-color:'+(backendConfigured()?'var(--ok)':'var(--border-2)')+'">'+icon('plug','sm')+'<span class="small"><b>Backend</b> · '+(backendConfigured()?('conectado a <span class="mono">'+esc(apiBase())+'</span>. El token de Apify vive en el servidor y los leads se guardan en PostgreSQL.'):'sin URL: el navegador llama a Apify directamente con el token de arriba y los leads quedan en este navegador.')+'</span></div>'+
+        field('Backend / API URL','<input class="input" id="apiBase" placeholder="https://tu-app.up.railway.app" value="'+esc(st.apiBase||'')+'">','Si la rellenas, las búsquedas y los leads pasan por el backend (recomendado en producción). Déjala vacía para usar el token del navegador.')+
+        '<div class="row gap8 mt8"><button class="btn primary" id="apiSave">'+icon('check','sm')+' Guardar backend</button><button class="btn ghost" id="apiClear">Quitar backend</button></div>')+
       card2('Telefonía (preparada, sin conectar)', 'phone', '<p class="small muted" style="margin-top:0">Capa <span class="mono">TelephonyProvider</span> con métodos definidos y webhooks vacíos. Compatible con Twilio, Aircall, Ringover y Zadarma.</p>'+
         field('Proveedor activo','<select class="select" id="telProvider">'+['manual','Twilio','Aircall','Ringover','Zadarma'].map(p=>'<option value="'+p+'" '+(st.provider===p?'selected':'')+'>'+p+'</option>').join('')+'</select>')+
         '<div class="notice mb8 mono tiny">POST /webhooks/telephony</div>'+
@@ -1172,70 +1237,6 @@ function reRender(){const app=$('#app');app.innerHTML=viewShell();mountShell();m
 
 /* --- job de búsqueda --- */
 function cancelJob(){if(S.job){clearInterval(S.job.int);S.job=null;}}
-function runSearchJob(){
-  const sector=$('#fSector').value.trim()||'Negocios';
-  const zona=$('#fZona').value.trim()||'Toda España';
-  const radio=parseInt($('#fRadio').value||'0',10);
-  const max=parseInt($('#fMax').value||'60',10);
-  const programar=$('#fProgramar').checked;
-  cancelJob();
-  const cells=Math.max(1,Math.ceil(max/60));
-  const job={sector,zona,radio,programar,progress:0,cells,found:0,dup:0,idx:0,paused:false,cell:0};
-  S.job=job;
-  const panel=$('#jobPanel');panel.style.display='';
-  $('#jobTitle').textContent='Buscando «'+sector+'» en '+zona;
-  const totalTarget=4+Math.floor(Math.random()*4);
-  const pool=makeSearchPool(sector,zona);
-  job.totalTarget=totalTarget;
-  const prevBtn=$('#jobResultsBtn');if(prevBtn)prevBtn.remove();
-  function tick(){
-    if(job.paused)return;
-    job.progress=Math.min(100,job.progress+Math.max(1,Math.round(9+Math.random()*9)));
-    const cellNow=Math.min(cells,Math.max(1,Math.ceil(job.progress/100*cells)));
-    if(cellNow>job.cell)job.cell=cellNow;
-    while((job.found+job.dup)<job.totalTarget&&job.progress>=((job.found+job.dup)+1)/job.totalTarget*100){
-      const candidate=pool[job.idx%pool.length];job.idx++;
-      if(candidate&&!candidate.dup){DB.leads.push(candidate);job.found++;}
-      else{job.dup++;}
-    }
-    $('#jobBar').style.width=job.progress+'%';
-    $('#jobBadge').textContent=job.paused?'En pausa':job.progress+'%';
-    $('#jobCell').textContent='Celda '+job.cell+'/'+cells+(radio?' · radio '+radio+' km':'');
-    $('#jobFound').textContent='Leads nuevos: '+job.found;
-    $('#jobDup').textContent='Duplicados: '+job.dup;
-    if(job.progress>=100){
-      cancelJob();
-      const search={id:uid('s'),user_id:S.user.id,sector,zona:zona==='Toda España'?'':zona,radio,estado:'completada',resultados:job.found+job.dup,nuevos:job.found,duplicados:job.dup,fecha:new Date().toISOString(),programada:programar?'mensual':null};
-      DB.searches.unshift(search);
-      audits('searches','create',null,{sector,zona,nuevos:job.found});
-      $('#jobTitle').textContent='Búsqueda completada';
-      $('#jobPause').textContent='Ver resultados';
-      toast('Búsqueda completada: '+job.found+' leads nuevos, '+job.dup+' duplicados','ok');
-      const bar=document.createElement('button');bar.id='jobResultsBtn';bar.className='btn primary mt16';bar.innerHTML=icon('arrowright','sm')+' Ver leads importados';
-      bar.addEventListener('click',()=>{S.job=null;S.filters.lead='nuevo';go('#/leads');});
-      $('#jobPanel .card-body').appendChild(bar);
-    }
-  }
-  job.int=setInterval(tick,420);
-  tick();
-  $('#jobPause').onclick=()=>{job.paused=!job.paused;$('#jobPause').innerHTML=(job.paused?icon('play','sm')+' Reanudar':icon('pause','sm')+' Pausar');$('#jobBadge').textContent=job.paused?'En pausa':job.progress+'%';};
-  $('#jobCancel').onclick=()=>{cancelJob();panel.style.display='none';};
-}
-function makeSearchPool(sector,zona){
-  const sectores=[sector,'Peluquería','Restaurante','Taller mecánico','Clínica dental','Cafetería','Gimnasio'];
-  const cities=[zona==='Toda España'?'Madrid':zona,'Málaga','Sevilla','Valencia','Barcelona','Madrid'];
-  const nombres=['Nuevo Negocio','Centro','Estudio','Grupo','Local','Espacio','Taller','Clínica','Bar','Salón'];
-  const out=[];
-  for(let i=0;i<7;i++){
-    const s=sectores[i%sectores.length];
-    const c=cities[i%cities.length];
-    const sc=55+Math.floor(Math.random()*40);
-    out.push(mkLead({nombre:nombres[i]+' '+(s.split(' ')[0])+' '+(10+i*7),sector:s,cicudad:c,ciudad:c,direccion:'Calle '+(i+1)*3+' '+(10+i*4),lat:36.5+i*.05,lng:-4.8-i*.03,telefono:'9'+String(10+Math.floor(Math.random()*89))+ ' '+String(100+Math.floor(Math.random()*899))+ ' '+String(100+Math.floor(Math.random()*899)),rating:+(4+Math.random()).toFixed(1),resenas:30+Math.floor(Math.random()*200),score:sc,estado:'nuevo',asignado:S.user.rol==='comercial'?S.user.id:'u3',fuente:'Google Places',desc:'Negocio de '+s.toLowerCase()+' en '+c+' sin web propia, detectado por el motor de búsqueda.',created:new Date().toISOString()}));
-    seedTimeline(out[out.length-1]);
-  }
-  if(out[1])out[1].dup=true;
-  return out;
-}
 
 /* --- adaptador de fuente: Apify --- */
 const APIFY_API='https://api.apify.com/v2';
@@ -1253,6 +1254,78 @@ function apifyConfigured(){const t=apifySettings().apifyToken;return !!(t&&Strin
 function apiBase(){const b=settings().apiBase;return (b&&String(b).trim())?String(b).trim().replace(/\/+$/,''):'';}
 function backendConfigured(){return !!apiBase();}
 function sourceReady(){return apifyConfigured()||backendConfigured();}
+function apifyActorPath(actor){const a=String(actor||APIFY_DEFAULT_ACTOR).trim();return a.indexOf('/')>=0?a.replace('/','~'):a;}
+function apifyStateMeta(){
+  const st=settings();
+  if(!apifyConfigured()&&!backendConfigured())return {label:'Sin fuente',bg:'var(--warn-tint)',fg:'var(--warn)'};
+  if(st.apifyOk)return {label:'Conectado',bg:'var(--ok-tint)',fg:'var(--ok)'};
+  if(st.apifyCheckedAt)return {label:'Error de conexión',bg:'var(--danger-tint)',fg:'var(--danger)'};
+  return {label:'Sin verificar',bg:'var(--warn-tint)',fg:'var(--warn)'};
+}
+function apifyErrorHint(err){
+  const s=err&&err.status;
+  if(s===401)return 'Token inválido o caducado.';
+  if(s===402)return 'La cuenta de Apify no tiene créditos.';
+  if(s===403)return 'El token no tiene permiso sobre ese actor.';
+  if(s===404)return 'Actor no encontrado. Revisa el identificador.';
+  if(s===429)return 'Demasiadas peticiones seguidas; espera un momento.';
+  return (err&&err.message)||'Error de conexión.';
+}
+function fetchJsonTimeout(url,opt,ms){
+  const ctrl=(typeof AbortController!=='undefined')?new AbortController():null;
+  const t=setTimeout(function(){if(ctrl)ctrl.abort();},ms||12000);
+  opt=Object.assign({},opt||{});if(ctrl)opt.signal=ctrl.signal;
+  return fetch(url,opt).then(function(res){
+    return res.text().then(function(txt){let j=null;try{j=JSON.parse(txt);}catch(e){}return {res:res,j:j,txt:txt};});
+  }).finally(function(){clearTimeout(t);});
+}
+function paintApifyState(){
+  const el=$('#apifyState');if(!el)return;
+  const m=apifyStateMeta();
+  el.textContent=m.label;el.style.background=m.bg;el.style.color=m.fg;
+  const det=$('#apifyDetail');
+  if(det){const d=settings();det.textContent=d.apifyCheckedAt?('Última comprobación: '+fmtDateTime(d.apifyCheckedAt)+(d.apifyDetail?(' · '+d.apifyDetail):'')):'Aún sin comprobar.';}
+}
+function testApifyConnection(){
+  const st=settings();
+  const btn=$('#apifyTest');
+  if(btn){btn.disabled=true;btn.innerHTML=icon('refresh','sm')+' Comprobando…';}
+  function finish(ok,msg,detail){
+    st.apifyOk=!!ok;st.apifyCheckedAt=new Date().toISOString();st.apifyDetail=String(detail||msg||'').slice(0,180);
+    persistSettings();paintApifyState();
+    if(btn){btn.disabled=false;btn.innerHTML=icon('plug','sm')+' Probar conexión';}
+    toast((ok?'Apify conectado':'No se pudo conectar')+(msg?(' · '+msg):''),ok?'ok':'err');
+  }
+  if(backendConfigured()){
+    const actor=String(st.apifyActor||APIFY_DEFAULT_ACTOR).trim();
+    fetchJsonTimeout(apiBase()+'/api/apify/status?actor='+encodeURIComponent(actor),{},12000).then(function(r){
+      const j=r.j||{};
+      if(r.res.ok&&j.valid)finish(true,'token del servidor validado',j.actor||'');
+      else finish(false,(j.message||('HTTP '+r.res.status)),j.message||'');
+    }).catch(function(e){finish(false,'no se pudo contactar con el backend',e&&e.name==='AbortError'?'tiempo de espera agotado':e.message);});
+    return;
+  }
+  const tok=String(st.apifyToken||'').trim();
+  if(!tok){finish(false,'falta el token de Apify','Pega un token o configura la URL del backend.');return;}
+  const actor=String(st.apifyActor||APIFY_DEFAULT_ACTOR).trim();
+  const path=apifyActorPath(actor);
+  const q='?token='+encodeURIComponent(tok);
+  fetchJsonTimeout(APIFY_API+'/users/me'+q,{},12000).then(function(r){
+    if(!r.res.ok){const e=new Error('HTTP '+r.res.status);e.status=r.res.status;throw e;}
+    const user=r.j&&r.j.data?r.j.data:null;
+    return fetchJsonTimeout(APIFY_API+'/acts/'+encodeURIComponent(path)+q,{},12000).then(function(a){
+      if(a.res.status===404){const e=new Error('Actor no encontrado: '+actor);e.status=404;throw e;}
+      if(!a.res.ok){const e=new Error('HTTP '+a.res.status);e.status=a.res.status;throw e;}
+      return {user:user,actor:a.j&&a.j.data?a.j.data:null};
+    });
+  }).then(function(d){
+    const who=d.user&&d.user.username?(' · '+d.user.username):'';
+    const title=d.actor&&d.actor.title?(' · '+d.actor.title):(' · '+actor);
+    finish(true,'token válido'+who+title,title.replace(/^ · /,''));
+  }).catch(function(e){
+    finish(false,apifyErrorHint(e),e&&e.name==='AbortError'?'tiempo de espera agotado':e.message);
+  });
+}
 function srcIsApify(){return (FUENTES[settings().fuente]||'')==='Apify';}
 function activeSourceLabel(){return FUENTES[settings().fuente]||'Google Places';}
 function isSocialUrl(u){if(!u)return false;const l=String(u).toLowerCase();return APIFY_SOCIAL.some(function(h){return l.indexOf(h)>=0;});}
@@ -1286,8 +1359,8 @@ function collectSocials(it,web){
 function socialIcon(r){return (r==='instagram'||r==='facebook')?r:'globe';}
 function normPhone(p){return String(p||'').replace(/[^0-9]/g,'');}
 function numOr(v,d){const n=parseFloat(v);return isNaN(n)?(d||0):n;}
-function persistSettings(){try{const s=settings();localStorage.setItem('od.settings',JSON.stringify({fuente:s.fuente,provider:s.provider,apifyToken:s.apifyToken,apifyActor:s.apifyActor,apiBase:s.apiBase}));}catch(e){}}
-function restoreSettings(){try{const raw=localStorage.getItem('od.settings');if(!raw)return;const o=JSON.parse(raw);const s=settings();if(typeof o.fuente==='number'&&o.fuente>=0&&o.fuente<FUENTES.length)s.fuente=o.fuente;if(o.provider)s.provider=o.provider;if(typeof o.apifyToken==='string')s.apifyToken=o.apifyToken;if(o.apifyActor)s.apifyActor=o.apifyActor;if(typeof o.apiBase==='string')s.apiBase=o.apiBase;}catch(e){}}
+function persistSettings(){try{const s=settings();localStorage.setItem('od.settings',JSON.stringify({fuente:s.fuente,provider:s.provider,apifyToken:s.apifyToken,apifyActor:s.apifyActor,apiBase:s.apiBase,apifyOk:s.apifyOk,apifyCheckedAt:s.apifyCheckedAt,apifyDetail:s.apifyDetail}));}catch(e){}}
+function restoreSettings(){try{const raw=localStorage.getItem('od.settings');if(!raw)return;const o=JSON.parse(raw);const s=settings();if(typeof o.fuente==='number'&&o.fuente>=0&&o.fuente<FUENTES.length)s.fuente=o.fuente;if(o.provider)s.provider=o.provider;if(typeof o.apifyToken==='string')s.apifyToken=o.apifyToken;if(o.apifyActor)s.apifyActor=o.apifyActor;if(typeof o.apiBase==='string')s.apiBase=o.apiBase;if(typeof o.apifyOk==='boolean')s.apifyOk=o.apifyOk;if(typeof o.apifyCheckedAt==='string')s.apifyCheckedAt=o.apifyCheckedAt;if(typeof o.apifyDetail==='string')s.apifyDetail=o.apifyDetail;}catch(e){}}
 function isComercialId(id){const u=DB.users.find(x=>x.id===id);return !!(u&&u.rol==='comercial');}
 function webLabel(l){return l.web_tipo==='propia'?'Con web propia':(l.web_tipo?('Solo '+l.web_tipo):'Sin web');}
 let _pw=null;
@@ -1301,6 +1374,8 @@ function leadScoreFrom(rating,resenas,web,email){
   s+=8;
   return Math.max(5,Math.min(100,s));
 }
+function stableKey(txt){let h=0;const s=String(txt||'');for(let i=0;i<s.length;i++){h=(h*31+s.charCodeAt(i))|0;}return Math.abs(h).toString(36).toUpperCase();}
+function stablePlaceId(nombre,dir,ciudad){return 'GEN'+stableKey((nombre||'')+'|'+(dir||'')+'|'+(ciudad||''));}
 function mapApifyItem(it,p){
   it=it||{};
   const loc=it.location||{};
@@ -1312,23 +1387,25 @@ function mapApifyItem(it,p){
   const rating=numOr(it.totalScore!=null?it.totalScore:it.rating,0);
   const resenas=parseInt(it.reviewsCount!=null?it.reviewsCount:it.reviews,10)||0;
   const redes=collectSocials(it,web);
+  const direccion=it.address||it.street||it.addressLine1||ciudad;
   return {
     nombre:nombre,sector:sector,
-    direccion:it.address||it.street||it.addressLine1||ciudad,
+    direccion:direccion,
     ciudad:ciudad,
     lat:numOr(loc.lat!=null?loc.lat:it.latitude,0),
     lng:numOr(loc.lng!=null?loc.lng:it.longitude,0),
     telefono:it.phone||it.phoneUnformatted||'',
     email:email,
-    web:hasOwnWeb(web)?'propia':(redes.length?'red social':null),
+    web:hasOwnWeb(web)?'propia':(redes.length?redes[0]:null),
     redes:redes,
     rating:rating,resenas:resenas,
     score:leadScoreFrom(rating,resenas,web,email),
     estado:'nuevo',
-    desc:'Negocio de '+String(sector).toLowerCase()+' en '+(ciudad||'la zona')+' detectado vía Apify'+(hasOwnWeb(web)?'':' (sin web propia)')+'.',
+    desc:'Negocio de '+String(sector).toLowerCase()+' en '+(ciudad||'la zona')+' detectado en Google Maps'+(hasOwnWeb(web)?'':' (sin web propia)')+'.',
     fuente:'Apify · Google Maps',
-    place_id:it.placeId||it.cid||it.fid||('APF'+Math.random().toString(36).slice(2,12).toUpperCase()),
-    maps:it.url||('https://maps.google.com/?q='+encodeURIComponent(nombre+' '+(ciudad||p.zona)))
+    created:new Date().toISOString(),
+    place_id:it.placeId||it.fid||it.cid||stablePlaceId(nombre,direccion,ciudad),
+    maps:it.url||it.googleMapsUrl||('https://maps.google.com/?q='+encodeURIComponent(nombre+' '+(ciudad||p.zona)))
   };
 }
 function buildApifyInput(actor,p,limit,sinWeb){
@@ -1338,13 +1415,10 @@ function buildApifyInput(actor,p,limit,sinWeb){
   const q=(p.sector||'negocios')+(zona?(' '+zona):' España');
   const input={
     searchStringsArray:[q],
-    searchString:q,
-    countryCode:'es',
+    countryCode:'ES',
     locationQuery:locationQuery,
     city:zona,
     maxCrawledPlacesPerSearch:limit,
-    maxResults:limit,
-    maxItems:limit,
     language:'es',
     skipClosedPlaces:true,
     scrapePlaceDetailPage:false
@@ -1371,15 +1445,23 @@ function apifyFetchItems(p,extCtrl){
         return res.json();
       });
     }
-    function finish(e,data){if(e){if(e&&e.name==='AbortError')return reject(new Error('tiempo de espera agotado'));return reject(new Error((e&&e.message)||'error de red'));}resolve(Array.isArray(data)?data:(data&&data.items)||[]);}
+    function finish(e,data){
+      if(e){
+        const out=new Error(e.name==='AbortError'?'tiempo de espera agotado':((e&&e.message)||'error de red'));
+        out.status=e.name==='AbortError'?504:(e&&e.status);
+        out.body=e&&e.body;
+        return reject(out);
+      }
+      resolve(Array.isArray(data)?data:(data&&data.items)||[]);
+    }
     /* Vía backend: el token y el actor viven en el servidor. */
     if(backendConfigured()){
       const base=apiBase();
-      const opt={method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({actor:actor,input:buildApifyInput(actor,p,limit)})};
+      const opt={method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({actor:actor,input:buildApifyInput(actor,p,limit),params:{sector:p.sector,zona:p.zona,max:limit},sinWeb:p.sinWeb!==false})};
       if(ctrl)opt.signal=ctrl.signal;
       fetch(base+'/api/search',opt).then(function(res){
         return res.json().catch(function(){return {};}).then(function(j){
-          if(!res.ok)throw new Error('HTTP '+res.status+((j&&j.error)?' · '+j.error:''));
+          if(!res.ok){const e=new Error('HTTP '+res.status+((j&&j.error)?(' · '+j.error):''));e.status=res.status;throw e;}
           return j;
         });
       }).then(function(j){settle(function(){finish(null,j);});})
@@ -1398,68 +1480,111 @@ function apifyFetchItems(p,extCtrl){
     });
   });
 }
+function isSpainItem(raw){
+  const cc=String(raw.countryCode||(raw.location&&raw.location.countryCode)||'').toUpperCase();
+  if(cc)return cc==='ES';
+  const addr=String(raw.address||'')+' '+String(raw.city||'')+' '+String((raw.location&&raw.location.address)||'');
+  if(/espa(ñ|n)a|spain/i.test(addr))return true;
+  return true;
+}
+function syncLeadsToBackend(leads){
+  const base=apiBase();if(!base||!leads||!leads.length)return;
+  fetch(base+'/api/leads',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({leads:leads})})
+    .then(function(res){if(!res.ok)throw new Error('HTTP '+res.status);return res.json();})
+    .then(function(){toast(leads.length+' leads guardados en el backend','ok');})
+    .catch(function(){toast('Leads guardados en local; el backend no respondió','warn');});
+}
 function importApifyItems(items,p){
   const existingId={};const existingPhone={};
   DB.leads.forEach(function(l){if(l.place_id)existingId[l.place_id]=1;const n=normPhone(l.telefono);if(n)existingPhone[n]=1;});
   const owner=(S.user&&S.user.id)?S.user.id:'u1';
-  const max=Math.max(1,p.max||60);
-  const out=[];let dup=0;
+  const max=Math.max(1,Math.min(120,p.max||60));
+  const out=[];const stats={sinNombre:0,fueraEspana:0,duplicado:0,conWeb:0,sinContacto:0};
   for(let i=0;i<items.length&&out.length<max;i++){
     const raw=items[i]||{};
     const m=mapApifyItem(raw,p);
-    if(!m.nombre){dup++;continue;}
-    const country=String(raw.countryCode||(raw.location&&raw.location.countryCode)||'').toUpperCase();
-    if(country&&country!=='ES'){dup++;continue;}
-    if(m.place_id&&existingId[m.place_id]){dup++;continue;}
+    if(!m.nombre){stats.sinNombre++;continue;}
+    if(!isSpainItem(raw)){stats.fueraEspana++;continue;}
+    if(m.place_id&&existingId[m.place_id]){stats.duplicado++;continue;}
     const np=normPhone(m.telefono);
-    if(np&&existingPhone[np]){dup++;continue;}
-    if(hasOwnWeb(raw.website||raw.websiteUrl)){dup++;continue;}
-    if(p.contacto==='tel'&&!m.telefono){dup++;continue;}
-    if(p.contacto==='tel-email'&&(!m.telefono||!m.email)){dup++;continue;}
+    if(np&&existingPhone[np]){stats.duplicado++;continue;}
+    if(hasOwnWeb(raw.website||raw.websiteUrl)){stats.conWeb++;continue;}
+    if(p.contacto==='tel'&&!m.telefono){stats.sinContacto++;continue;}
+    if(p.contacto==='tel-email'&&(!m.telefono||!m.email)){stats.sinContacto++;continue;}
     m.asignado=owner;
     const l=mkLead(m);
     l.place_id=m.place_id;l.fuente=m.fuente;l.maps=m.maps;
-    seedTimeline(l);
+    l.interactions.push({id:uid('i'),user_id:'system',tipo:'estado',resultado:null,nota:'Lead importado desde '+l.fuente+' ('+l.place_id+').',fecha:new Date().toISOString()});
     DB.leads.push(l);out.push(l);
     if(m.place_id)existingId[m.place_id]=1;
     if(np)existingPhone[np]=1;
   }
+  const dup=stats.sinNombre+stats.fueraEspana+stats.duplicado+stats.conWeb+stats.sinContacto;
   if(out.length)persistDB();
-  return {leads:out,dup:dup};
+  return {leads:out,dup:dup,stats:stats};
 }
 function readSearchParams(){
   function el(id){return document.getElementById(id);}
   const sector=el('fSector')?el('fSector').value.trim():'';
   const zona=el('fZona')?el('fZona').value.trim():'';
+  const rawMax=parseInt((el('fMax')&&el('fMax').value)||'60',10);
+  const max=Math.max(1,Math.min(120,isNaN(rawMax)?60:rawMax));
   return {
     sector:sector||'Negocios',
     zona:zona||'Toda España',
-    radio:parseInt((el('fRadio')&&el('fRadio').value)||'0',10),
-    max:parseInt((el('fMax')&&el('fMax').value)||'60',10),
+    radio:parseInt((el('fRadio')&&el('fRadio').value)||'0',10)||0,
+    max:max,
     contacto:(el('fContacto')&&el('fContacto').value)||'cualquiera',
-    sinWeb:!!(el('fSinWeb')&&el('fSinWeb').checked),
+    sinWeb:true,
     cobertura:(el('fCobertura')&&el('fCobertura').value)||'auto',
     programar:!!(el('fProgramar')&&el('fProgramar').checked)
   };
 }
 function setJobProgress(v){const b=document.getElementById('jobBar');if(b)b.style.width=Math.max(0,Math.min(100,v))+'%';const g=document.getElementById('jobBadge');if(g)g.textContent='Apify '+Math.round(v)+'%';}
-function finishSearchJob(newCount,dup,p,label){
+function finishSearchJob(newCount,dup,p,label,job){
   const zonaLabel=p.cellsCount>1?('Toda España · '+p.cellsCount+' provincias'):(p.zona==='Toda España'?'':p.zona);
   const search={id:uid('s'),user_id:S.user.id,sector:p.sector,zona:zonaLabel,radio:p.radio,estado:'completada',resultados:newCount+dup,nuevos:newCount,duplicados:dup,fecha:new Date().toISOString(),programada:p.programar?'mensual':null};
   DB.searches.unshift(search);
   audits('searches','create',null,{sector:p.sector,zona:p.zona,nuevos:newCount,fuente:label});
   setJobProgress(100);
+  const st=(job&&job.stats)||{};
+  const errors=(job&&job.errors)||[];
   const t=document.getElementById('jobTitle');if(t)t.textContent='Búsqueda completada · '+label;
-  const f=document.getElementById('jobFound');if(f)f.textContent='Leads nuevos: '+newCount;
+  const f=document.getElementById('jobFound');if(f)f.textContent='Leads importados: '+newCount;
   const d=document.getElementById('jobDup');if(d)d.textContent='Descartados: '+dup;
+  const br=document.getElementById('jobBreakdown');
+  if(br){
+    const reasons=[];
+    if(st.conWeb)reasons.push(st.conWeb+' con web propia');
+    if(st.duplicado)reasons.push(st.duplicado+' duplicados');
+    if(st.fueraEspana)reasons.push(st.fueraEspana+' fuera de España');
+    if(st.sinContacto)reasons.push(st.sinContacto+' sin el contacto exigido');
+    if(st.sinNombre)reasons.push(st.sinNombre+' sin nombre');
+    br.innerHTML=reasons.length?('<span class="muted">Motivos de descarte:</span> '+reasons.join(' · ')):'<span class="muted">Todos los resultados válidos se importaron.</span>';
+  }
+  const er=document.getElementById('jobErrors');
+  if(er){
+    if(errors.length){
+      er.innerHTML='<div class="notice mt16" style="border-color:var(--warn)">'+icon('alert','sm')+'<span class="small"><b>'+errors.length+' celda(s) con error.</b> '+errors.slice(0,4).map(function(x){return esc(x);}).join(' · ')+(errors.length>4?' …':'')+'</span></div>';
+    }else{er.innerHTML='';}
+  }
   const pause=document.getElementById('jobPause');if(pause)pause.style.display='none';
   const panel=document.getElementById('jobPanel');const body=panel?panel.querySelector('.card-body'):null;
-  if(body){const old=document.getElementById('jobResultsBtn');if(old)old.remove();const bar=document.createElement('button');bar.id='jobResultsBtn';bar.className='btn primary mt16';bar.innerHTML=icon('arrowright','sm')+' Ver leads importados';bar.addEventListener('click',function(){S.job=null;S.filters.lead='nuevo';go('#/leads');});body.appendChild(bar);}
-  toast(label+' completado: '+newCount+' leads nuevos, '+dup+' descartados','ok');
+  if(body){
+    const old=document.getElementById('jobResultsBtn');if(old)old.remove();
+    const oldOffer=document.getElementById('jobOfferBtn');if(oldOffer)oldOffer.remove();
+    const bar=document.createElement('button');bar.id='jobResultsBtn';bar.className='btn primary mt16';bar.innerHTML=icon('arrowright','sm')+' Ver leads importados';bar.addEventListener('click',function(){S.job=null;S.filters.lead='nuevo';go('#/leads');});
+    body.appendChild(bar);
+    if(newCount){
+      const offer=document.createElement('button');offer.id='jobOfferBtn';offer.className='btn outline mt16';offer.style.marginLeft='8px';offer.innerHTML=icon('globe','sm')+' Ofrecer web + CRM';offer.addEventListener('click',function(){S.job=null;S.filters.lead='nuevo';S.filters.web='todos';go('#/leads');});
+      body.appendChild(offer);
+    }
+  }
+  toast(label+': '+newCount+' leads importados, '+dup+' descartados',newCount?'ok':'warn');
 }
 function startSearch(){
   if(apifyConfigured()||backendConfigured()){startApifySearch();return;}
-  toast('Conecta tu API de Apify (token, o la URL del backend) en Administración → Configuración para obtener datos reales. El modo demo está desactivado.','warn');
+  toast('Conecta tu token de Apify o la URL del backend en Administración → Configuración. Sin fuente no se generan leads de prueba.','warn');
   const panel=document.getElementById('jobPanel');if(panel)panel.style.display='none';
 }
 function startApifySearch(){
@@ -1469,10 +1594,13 @@ function startApifySearch(){
   panel.style.display='';
   const cells=spainCells(p);
   const perCell=Math.max(1,Math.min(60,Math.ceil((p.max||60)/cells.length)));
-  const job={cells:cells,perCell:perCell,idx:0,found:0,dup:0,paused:false,cancelled:false,ac:null};
+  const job={cells:cells,perCell:perCell,idx:0,found:0,dup:0,paused:false,cancelled:false,ac:null,errors:[],imported:[],stats:{sinNombre:0,fueraEspana:0,duplicado:0,conWeb:0,sinContacto:0}};
   S.job=job;
   const t=document.getElementById('jobTitle');if(t)t.textContent='Consultando Apify · '+p.sector+(cells.length>1?(' · '+cells.length+' provincias'):(p.zona!=='Toda España'?(' en '+p.zona):''));
   const prev=document.getElementById('jobResultsBtn');if(prev)prev.remove();
+  const prevOffer=document.getElementById('jobOfferBtn');if(prevOffer)prevOffer.remove();
+  const br=document.getElementById('jobBreakdown');if(br)br.textContent='';
+  const er=document.getElementById('jobErrors');if(er)er.innerHTML='';
   const pause=document.getElementById('jobPause');const cancel=document.getElementById('jobCancel');
   if(pause){pause.style.display='';pause.innerHTML=icon('pause','sm')+' Pausar';}
   if(cancel)cancel.style.display='';
@@ -1489,8 +1617,9 @@ function startApifySearch(){
   function done(partial){
     cancelJob();
     p.cellsCount=cells.length;
-    finishSearchJob(job.found,job.dup,p,'Apify'+(cells.length>1?(' · '+cells.length+' provincias'):''));
-    if(partial){const f=document.getElementById('jobFound');if(f)f.textContent='Leads nuevos: '+job.found+' · interrumpido';}
+    if(job.imported.length)syncLeadsToBackend(job.imported);
+    finishSearchJob(job.found,job.dup,p,'Apify'+(cells.length>1?(' · '+cells.length+' provincias'):''),job);
+    if(partial){const f=document.getElementById('jobFound');if(f)f.textContent='Leads importados: '+job.found+' · interrumpido';}
   }
   function next(){
     if(job.cancelled||job.paused)return;
@@ -1502,13 +1631,22 @@ function startApifySearch(){
       if(job.cancelled)return;
       const r=importApifyItems(items,cp);
       job.found+=r.leads.length;job.dup+=r.dup;
+      job.imported=job.imported.concat(r.leads);
+      Object.keys(job.stats).forEach(function(k){job.stats[k]+=(r.stats&&r.stats[k])||0;});
       job.idx++;upd();
       next();
     }).catch(function(err){
       if(job.cancelled)return;
-      job.cancelled=true;cancelJob();
-      toast('Apify falló en «'+cell.label+'»: '+err.message,'warn');
-      if(job.found||job.dup){done(true);}else if(panel)panel.style.display='none';
+      const hint=apifyErrorHint(err);
+      job.errors.push(cell.label+': '+hint);
+      if(err.status===401||err.status===402||err.status===403){
+        job.cancelled=true;cancelJob();
+        toast('Apify: '+hint,'err');
+        if(job.found||job.dup){done(true);}else{panel.style.display='none';}
+        return;
+      }
+      job.idx++;upd();
+      if(job.idx>=cells.length){done(true);}else{next();}
     });
   }
   if(pause)pause.onclick=function(){job.paused=!job.paused;pause.innerHTML=job.paused?(icon('play','sm')+' Reanudar'):(icon('pause','sm')+' Pausar');if(!job.paused)next();upd();};
@@ -1522,15 +1660,15 @@ function saveApifySettings(){
   const actEl=document.getElementById('apifyActor');
   const tok=tokEl?String(tokEl.value||'').trim():'';
   const actor=(actEl?String(actEl.value||'').trim():'')||APIFY_DEFAULT_ACTOR;
-  st.apifyToken=tok;st.apifyActor=actor;
+  st.apifyToken=tok;st.apifyActor=actor;st.apifyOk=false;st.apifyCheckedAt='';st.apifyDetail='';
   if(tok)st.fuente=FUENTES.indexOf('Apify');
   persistSettings();
   audits('settings','update',null,{apify:tok?'token configurado':'token vacío',actor:actor});
-  toast(tok?'Apify conectado: token guardado solo en este navegador':'Token de Apify guardado','ok');
+  toast(tok?'Token guardado. Pulsa «Probar conexión» para validarlo.':'Token de Apify guardado (vacío)',tok?'ok':'warn');
   render();
 }
 function clearApifySettings(){
-  const st=settings();st.apifyToken='';persistSettings();
+  const st=settings();st.apifyToken='';st.apifyOk=false;st.apifyCheckedAt='';st.apifyDetail='';persistSettings();
   audits('settings','update',null,{apify:'token eliminado'});
   toast('Token de Apify eliminado','warn');render();
 }
@@ -1538,29 +1676,85 @@ function saveApiBase(){
   const el=document.getElementById('apiBase');
   const val=el?String(el.value||'').trim():'';
   const clean=val.replace(/\/+$/,'');
-  const st=settings();st.apiBase=clean;persistSettings();
+  const st=settings();st.apiBase=clean;st.apifyOk=false;st.apifyCheckedAt='';st.apifyDetail='';persistSettings();
   audits('settings','update',null,{apiBase:clean||'(vacío)'});
-  toast(clean?('Backend configurado: '+clean):'Backend desactivado (se usará el token del navegador)',clean?'ok':'warn');
+  toast(clean?('Backend configurado: '+clean+' · usa «Probar conexión»'):'Backend desactivado (se usará el token del navegador)',clean?'ok':'warn');
   render();
 }
 function clearApiBase(){
-  const st=settings();st.apiBase='';persistSettings();
+  const st=settings();st.apiBase='';st.apifyOk=false;st.apifyCheckedAt='';st.apifyDetail='';persistSettings();
   audits('settings','update',null,{apiBase:'(eliminado)'});
   toast('Backend eliminado','warn');render();
+}
+function parseDatasetText(txt){
+  const raw=String(txt||'').trim();
+  if(!raw)throw new Error('Pega un JSON o JSONL exportado de Apify.');
+  try{
+    const j=JSON.parse(raw);
+    if(Array.isArray(j))return j;
+    if(j&&Array.isArray(j.items))return j.items;
+    if(j&&Array.isArray(j.data&&j.data.items))return j.data.items;
+  }catch(e){}
+  const rows=[];
+  raw.split(/\r?\n/).forEach(function(line){line=line.trim();if(!line)return;try{const o=JSON.parse(line);if(o&&typeof o==='object')rows.push(o);}catch(e){}});
+  if(rows.length)return rows;
+  throw new Error('El texto no es un JSON válido de Apify.');
+}
+function importDataset(){
+  const ta=document.getElementById('dsJson');
+  const out=document.getElementById('dsResult');
+  let items;
+  try{items=parseDatasetText(ta?ta.value:'');}catch(e){toast(e.message,'warn');return;}
+  if(!items.length){toast('El dataset está vacío','warn');return;}
+  const p=readSearchParams();
+  p.max=Math.max(1,Math.min(120,items.length));
+  const r=importApifyItems(items,p);
+  if(r.leads.length)syncLeadsToBackend(r.leads);
+  const parts=[];
+  if(r.stats.conWeb)parts.push(r.stats.conWeb+' con web propia');
+  if(r.stats.duplicado)parts.push(r.stats.duplicado+' duplicados');
+  if(r.stats.fueraEspana)parts.push(r.stats.fueraEspana+' fuera de España');
+  if(r.stats.sinContacto)parts.push(r.stats.sinContacto+' sin el contacto exigido');
+  if(r.stats.sinNombre)parts.push(r.stats.sinNombre+' sin nombre');
+  if(out)out.innerHTML='<b>'+r.leads.length+'</b> leads importados · '+r.dup+' descartados'+(parts.length?(' <span class="muted">('+parts.join(' · ')+')</span>'):'')+'.';
+  toast('Dataset: '+r.leads.length+' leads importados, '+r.dup+' descartados',r.leads.length?'ok':'warn');
+  if(r.leads.length){S.filters.lead='nuevo';S.filters.web='todos';}
+}
+function loadDatasetFile(input){
+  const f=input&&input.files&&input.files[0];if(!f)return;
+  const reader=new FileReader();
+  reader.onload=function(){const ta=document.getElementById('dsJson');if(ta){ta.value=String(reader.result||'');toast('Archivo cargado; pulsa «Importar dataset»','ok');}};
+  reader.onerror=function(){toast('No se pudo leer el archivo','err');};
+  reader.readAsText(f);
 }
 
 /* --- abrir ficha / acciones --- */
 function bindDelegates(){
   document.addEventListener('click',function(e){
-    const t=e.target.closest('[data-go],[data-filter],[data-webfilter],[data-bulkassign],[data-tab],[data-estado],[data-call],[data-demo],[data-send],[data-addnote],[data-ticket],[data-edituser],[data-tfilter],[data-newticket],[data-toggle-nocontact],[data-reassign],[data-next],[data-score],[data-newarticle],[data-kbview],[data-source],[data-webhooktest],[data-notif],[data-demoopen],[data-web],[data-copyprompt],#exportLeads,#exportClients,#runSearch,#resetSearch,#newUser,#apifySave,#apifyClear,#apiSave,#apiClear');
+    if(e.target.closest('[data-select],#selAll'))return;
+    const t=e.target.closest('[data-go],[data-filter],[data-webfilter],[data-bulkassign],[data-tab],[data-estado],[data-call],[data-demo],[data-send],[data-addnote],[data-ticket],[data-edituser],[data-tfilter],[data-newticket],[data-toggle-nocontact],[data-reassign],[data-next],[data-score],[data-newarticle],[data-kbview],[data-source],[data-webhooktest],[data-notif],[data-demoopen],[data-web],[data-copyprompt],#exportLeads,#exportClients,#runSearch,#resetSearch,#quickSearch,#importDataset,#newUser,#apifySave,#apifyClear,#apifyTest,#apiSave,#apiClear,#bulkAssign,#bulkStatus,#bulkNoContact,#bulkExport,#bulkDelete,#bulkClear,#selectAllBtn');
     if(!t)return;
     if(t.hasAttribute('data-go')){go(t.getAttribute('data-go'));return;}
-    if(t.hasAttribute('data-filter')){S.filters.lead=t.getAttribute('data-filter');render();return;}
-    if(t.hasAttribute('data-webfilter')){S.filters.web=t.getAttribute('data-webfilter');render();return;}
-    if(t.hasAttribute('data-bulkassign')){openBulkAssignModal();return;}
+    if(t.hasAttribute('data-filter')){clearLeadSel();S.filters.lead=t.getAttribute('data-filter');render();return;}
+    if(t.hasAttribute('data-webfilter')){clearLeadSel();S.filters.web=t.getAttribute('data-webfilter');render();return;}
+    if(t.hasAttribute('data-bulkassign')){openBulkAssignModal(leadSelIds());return;}
+    if(t.id==='bulkAssign'){openBulkAssignModal(leadSelIds());return;}
+    if(t.id==='bulkStatus'){openBulkStatusModal(leadSelIds());return;}
+    if(t.id==='bulkNoContact'){bulkToggleNoContact(leadSelIds());return;}
+    if(t.id==='bulkExport'){exportCSV('leads',leadSelIds().map(leadById).filter(Boolean));return;}
+    if(t.id==='bulkDelete'){bulkDeleteLeads(leadSelIds());return;}
+    if(t.id==='bulkClear'){clearLeadSel();paintLeadSel();return;}
+    if(t.id==='selectAllBtn'){
+      const rows=document.querySelectorAll('[data-lead-row]');
+      const all=rows.length>0&&leadSelIds().length===rows.length;
+      selectAllVisible(!all);return;
+    }
     if(t.hasAttribute('data-tab')){const[k,v]=t.getAttribute('data-tab').split(':');S.tabs[k]=v;render();return;}
     if(t.hasAttribute('data-tfilter')){S.filters.ticket=t.getAttribute('data-tfilter');render();return;}
     if(t.id==='runSearch'){startSearch();return;}
+    if(t.id==='quickSearch'){const m=document.getElementById('fMax');if(m)m.value='10';const c=document.getElementById('fCobertura');if(c)c.value='zona';startSearch();return;}
+    if(t.id==='importDataset'){importDataset();return;}
+    if(t.id==='apifyTest'){testApifyConnection();return;}
     if(t.id==='apifySave'){saveApifySettings();return;}
     if(t.id==='apifyClear'){clearApifySettings();return;}
     if(t.id==='apiSave'){saveApiBase();return;}
@@ -1590,9 +1784,17 @@ function bindDelegates(){
     if(t.hasAttribute('data-copyprompt')){copyPrompt(t.getAttribute('data-copyprompt'));return;}
   });
   document.addEventListener('change',function(e){
+    if(e.target.id==='selAll'){selectAllVisible(e.target.checked);return;}
+    if(e.target.hasAttribute&&e.target.hasAttribute('data-select')){
+      const id=e.target.getAttribute('data-select');
+      if(!S.leadSel)S.leadSel={};
+      if(e.target.checked)S.leadSel[id]=1;else delete S.leadSel[id];
+      paintLeadSel();return;
+    }
     const n=e.target.closest('[data-toggle-nocontact]');
     if(n){const l=leadById(n.getAttribute('data-toggle-nocontact'));l.no_contactar=n.checked;audits('leads','no_contactar',!n.checked,n.checked);toast(n.checked?'Lead marcado como No contactar':'Marca de No contactar retirada',n.checked?'warn':'ok');render();return;}
     if(e.target.id==='telProvider'){setProvider(e.target.value);}
+    if(e.target.id==='dsFile'){loadDatasetFile(e.target);return;}
   });
 }
 function addNote(id){
@@ -1609,18 +1811,19 @@ function sendDemo(id){
   audits('demos','send',null,{lead:id,canal:ch});
   toast('Demo enviada por '+ch,'ok');render();
 }
-function exportCSV(kind){
+function exportCSV(kind,subset){
   let rows,csv;
   if(kind==='leads'){
-    rows=visibleLeads();
+    rows=(Array.isArray(subset)&&subset.length)?subset:visibleLeads();
     csv=[['id','place_id','nombre','sector','ciudad','estado','score','rating','resenas','telefono','email','web','asignado']].concat(rows.map(l=>[l.id,l.place_id,l.nombre,l.sector,l.ciudad,ESTADOS[l.estado].label,l.score,l.rating,l.resenas,l.telefono,l.email,webLabel(l),userById(l.asignado_a).nombre])).map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
   }else{
-    csv=[['id','nombre','plan','precio','alta','renovacion','estado']].concat(DB.customers.map(c=>[c.id,c.nombre,c.plan,c.precio,fmtDate(c.fecha_alta),fmtDate(c.renovacion),c.estado])).map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
+    rows=DB.customers;
+    csv=[['id','nombre','plan','precio','alta','renovacion','estado']].concat(rows.map(c=>[c.id,c.nombre,c.plan,c.precio,fmtDate(c.fecha_alta),fmtDate(c.renovacion),c.estado])).map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
   }
   const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='digitaliza-'+kind+'.csv';a.click();
-  audits(kind,'export',null,{filas:(kind==='leads'?visibleLeads():DB.customers).length});
-  toast('Exportación CSV generada','ok');
+  audits(kind,'export',null,{filas:rows.length});
+  toast(kind==='leads'?(rows.length+' leads exportados a CSV'):'Exportación CSV generada','ok');
 }
 
 /* --- cambio de estado --- */
@@ -1899,13 +2102,16 @@ function kbArticles(){
   return DB.kb;
 }
 function settings(){
-  if(!DB.settings)DB.settings={fuente:0,provider:'manual',apifyToken:'',apifyActor:APIFY_DEFAULT_ACTOR,apiBase:''};
+  if(!DB.settings)DB.settings={fuente:0,provider:'manual',apifyToken:'',apifyActor:APIFY_DEFAULT_ACTOR,apiBase:'',apifyOk:false,apifyCheckedAt:'',apifyDetail:''};
   if(DB.settings.apifyToken===undefined)DB.settings.apifyToken='';
   if(!DB.settings.apifyActor)DB.settings.apifyActor=APIFY_DEFAULT_ACTOR;
   if(DB.settings.apiBase===undefined)DB.settings.apiBase='';
+  if(DB.settings.apifyOk===undefined)DB.settings.apifyOk=false;
+  if(DB.settings.apifyCheckedAt===undefined)DB.settings.apifyCheckedAt='';
+  if(DB.settings.apifyDetail===undefined)DB.settings.apifyDetail='';
   return DB.settings;
 }
-function auditLabel(a){const map={create:'Creación',update:'Actualización',estado:'Cambio de estado',convert:'Conversión',export:'Exportación',send:'Envío',no_contactar:'Marca no contactar',reassign:'Reasignación',webhook:'Webhook'};return (map[a.accion]||a.accion)+' · '+a.entidad;}
+function auditLabel(a){const map={create:'Creación',update:'Actualización',estado:'Cambio de estado',convert:'Conversión',export:'Exportación',send:'Envío',no_contactar:'Marca no contactar',reassign:'Reasignación',webhook:'Webhook',delete:'Eliminación'};return (map[a.accion]||a.accion)+' · '+a.entidad;}
 function notifItems(){
   const items=[];
   visibleLeads().filter(l=>l.proxima_accion&&new Date(l.proxima_accion)<=new Date(Date.now()+86400000)).forEach(l=>{items.push({kind:'task',t:(isToday(l.proxima_accion)?'Hoy · ':'Próxima · ')+(l.proxima_tipo||'Seguimiento'),s:l.nombre,f:l.proxima_accion});});
@@ -1947,19 +2153,24 @@ function openReassignModal(id){
       };
     }});
 }
-function openBulkAssignModal(){
-  if(!isAdmin()){toast('Solo el administrador reparte leads','warn');return;}
+function openBulkAssignModal(ids){
+  if(!canReassign()){toast('Solo administradores y supervisores pueden reasignar leads','warn');return;}
+  const selected=(ids||[]).map(leadById).filter(Boolean);
+  const pool=selected.length?selected.filter(l=>l.estado!=='convertido'):DB.leads.filter(l=>l.estado==='nuevo'&&!isComercialId(l.asignado_a));
+  const skipped=selected.length-pool.length;
   const coms=DB.users.filter(u=>u.rol==='comercial'&&u.activo);
-  const pool=DB.leads.filter(l=>l.estado==='nuevo'&&!isComercialId(l.asignado_a));
+  const intro=selected.length
+    ? 'Se reasignarán <b>'+pool.length+'</b> leads seleccionados al comercial elegido.'+(skipped?' Se omiten <b>'+skipped+'</b> convertidos, que ya pertenecen a Clientes.':'')
+    : 'Se repartirán <b>'+pool.length+'</b> leads en estado <b>Nuevo</b> que aún no están en un portafolio comercial. Los leads ya asignados no se tocan.';
   modal({title:'Asignar leads a un comercial',body:
     field('Comercial destino','<select class="select" id="bulkUser">'+coms.map(u=>'<option value="'+u.id+'">'+esc(u.nombre)+'</option>').join('')+'</select>')+
     field('Modo de reparto','<select class="select" id="bulkMode"><option value="manual">Todos al comercial elegido</option><option value="round">Reparto equitativo (round-robin)</option></select>')+
-    '<div class="notice">'+icon('info','sm')+'<span class="small">Se repartirán <b>'+pool.length+'</b> leads en estado <b>Nuevo</b> que aún no están en un portafolio comercial. Los leads ya asignados no se tocan.</span></div>',
+    '<div class="notice">'+icon('info','sm')+'<span class="small">'+intro+'</span></div>',
     footer:'<button class="btn" data-close="1">Cancelar</button><button class="btn primary" id="bulkSave">'+icon('users','sm')+' Asignar</button>',
     onMount(root){
       $('#bulkSave',root).onclick=()=>{
         if(!coms.length){toast('No hay comerciales activos','warn');return;}
-        if(!pool.length){toast('No hay leads pendientes de asignar','warn');return;}
+        if(!pool.length){toast('No hay leads que asignar','warn');return;}
         const mode=$('#bulkMode',root).value;
         const chosen=$('#bulkUser',root).value;
         const load=u=>DB.leads.filter(x=>x.asignado_a===u.id).length;
@@ -1967,10 +2178,67 @@ function openBulkAssignModal(){
           let target=chosen;
           if(mode==='round'){target=coms.slice().sort((a,b)=>load(a)-load(b))[0].id;}
           const before=l.asignado_a;l.asignado_a=target;
-          l.interactions.push({id:uid('i'),user_id:S.user.id,tipo:'estado',resultado:null,nota:'Lead asignado al portafolio de '+userById(target).nombre+' por el administrador.',fecha:new Date().toISOString()});
+          l.interactions.push({id:uid('i'),user_id:S.user.id,tipo:'estado',resultado:null,nota:'Lead asignado al portafolio de '+userById(target).nombre+'.',fecha:new Date().toISOString()});
           audits('leads','reassign',before,target);
         });
-        toast(pool.length+' leads asignados a portafolio','ok');closeModal();render();
+        clearLeadSel();toast(pool.length+' leads asignados a portafolio','ok');closeModal();render();
+      };
+    }});
+}
+function openBulkStatusModal(ids){
+  const leads=(ids||[]).map(leadById).filter(l=>l&&l.estado!=='convertido');
+  if(!leads.length){toast('Selecciona al menos un lead no convertido','warn');return;}
+  const states=['nuevo','no_contesta','presentado','potencial','no_interes','numero_erroneo','descartado'];
+  modal({title:'Cambiar estado de '+leads.length+' leads',body:
+    field('Nuevo estado','<select class="select" id="bulkEstado">'+states.map(e=>'<option value="'+e+'">'+ESTADOS[e].label+'</option>').join('')+'</select>')+
+    '<div id="bulkMotivo"></div>'+
+    '<div class="notice">'+icon('info','sm')+'<span class="small">Se aplicará el mismo estado a los '+leads.length+' leads seleccionados y quedará registrado en su timeline. «Callback» y «Convertido» se gestionan lead a lead.</span></div>',
+    footer:'<button class="btn" data-close="1">Cancelar</button><button class="btn primary" id="bulkEstadoSave">'+icon('check','sm')+' Aplicar</button>',
+    onMount(root){
+      const sel=$('#bulkEstado',root);const extra=$('#bulkMotivo',root);
+      function draw(){extra.innerHTML=sel.value==='no_interes'?field('Motivo del rechazo','<select class="select" id="bulkMotivoSel"><option value="">Selecciona…</option>'+MOTIVOS_RECHAZO.map(m=>'<option>'+m+'</option>').join('')+'</select>'):'';}
+      sel.onchange=draw;draw();
+      $('#bulkEstadoSave',root).onclick=()=>{
+        const v=sel.value;const motivo=sel.value==='no_interes'?($('#bulkMotivoSel',root)||{}).value:'';
+        if(v==='no_interes'&&!motivo){toast('Indica el motivo del rechazo','warn');return;}
+        leads.forEach(l=>{
+          const before=l.estado;l.estado=v;
+          if(v==='no_interes')l.motivo_descarte=motivo;
+          l.interactions.push({id:uid('i'),user_id:S.user.id,tipo:'estado',resultado:v==='no_interes'?'rechazo':null,nota:'Cambio de estado a '+ESTADOS[v].label+'.'+(motivo?' Motivo: '+motivo+'.':''),fecha:new Date().toISOString()});
+          audits('leads','estado',before,v);
+        });
+        clearLeadSel();closeModal();render();toast(leads.length+' leads actualizados a '+ESTADOS[v].label,'ok');
+      };
+    }});
+}
+function bulkToggleNoContact(ids){
+  const leads=(ids||[]).map(leadById).filter(Boolean);
+  if(!leads.length){toast('Selecciona al menos un lead','warn');return;}
+  const block=!leads.every(l=>l.no_contactar);
+  leads.forEach(l=>{
+    const before=l.no_contactar;l.no_contactar=block;
+    l.interactions.push({id:uid('i'),user_id:S.user.id,tipo:'estado',resultado:null,nota:block?'Lead marcado como No contactar.':'Marca de No contactar retirada.',fecha:new Date().toISOString()});
+    audits('leads','no_contactar',before,block);
+  });
+  render();paintLeadSel();toast(leads.length+' leads '+(block?'marcados como No contactar':'con contacto permitido'),block?'warn':'ok');
+}
+function bulkDeleteLeads(ids){
+  if(!isAdmin()){toast('Solo el administrador puede eliminar leads','warn');return;}
+  const leads=(ids||[]).map(leadById).filter(Boolean);
+  if(!leads.length){toast('Selecciona al menos un lead','warn');return;}
+  const protectedRows=leads.filter(l=>l.estado==='convertido'||DB.customers.some(c=>c.lead_id===l.id));
+  const deletable=leads.filter(l=>protectedRows.indexOf(l)<0);
+  if(!deletable.length){toast('No se pueden eliminar leads convertidos con cliente asociado','warn');return;}
+  modal({title:'Eliminar '+deletable.length+' leads',body:
+    '<div class="notice" style="border-color:var(--danger)">'+icon('alert','sm')+'<span class="small"><b>Esta acción no se puede deshacer.</b> Se eliminarán '+deletable.length+' leads y sus interacciones de este navegador.'+(protectedRows.length?' Se omitirán '+protectedRows.length+' convertidos con cliente asociado.':'')+'</span></div>'+
+    '<p class="small muted mt8">'+deletable.slice(0,8).map(l=>esc(l.nombre)).join(' · ')+(deletable.length>8?' …':'')+'</p>',
+    footer:'<button class="btn" data-close="1">Cancelar</button><button class="btn primary" id="bulkDelConfirm" style="background:var(--danger);border-color:var(--danger)">'+icon('trash','sm')+' Eliminar definitivamente</button>',
+    onMount(root){
+      $('#bulkDelConfirm',root).onclick=()=>{
+        const set={};deletable.forEach(l=>{set[l.id]=1;});
+        DB.leads=DB.leads.filter(l=>!set[l.id]);
+        audits('leads','delete',null,{ids:deletable.map(l=>l.id),nombres:deletable.map(l=>l.nombre)});
+        clearLeadSel();closeModal();render();toast(deletable.length+' leads eliminados','ok');
       };
     }});
 }
@@ -2098,6 +2366,7 @@ function aiReply(q){
    INIT
    ========================================================================= */
 bindDelegates();
+document.title='Digitaliza CRM v'+APP_VERSION+' · Multi-desk de captación';
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();if(S.aiOpen){S.aiOpen=false;mountAI();}}});
 window.addEventListener('resize',()=>{const t=$('#navToggle');if(t)t.style.display=window.innerWidth<=960?'inline-flex':'none';});
 restoreSettings();

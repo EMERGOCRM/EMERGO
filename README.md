@@ -4,6 +4,22 @@ Prototipo de CRM para captar y digitalizar negocios sin presencia online.
 Este repositorio contiene el frontend estático (`index.html`) **y** el API
 (Node + TypeScript + Express + PostgreSQL) que lo alimenta.
 
+## Versión
+
+**Versión actual: 1.0.0** (18/10/2026)
+
+- Se muestra en la app (sidebar, login y Configuración) y en `VERSION`.
+- Antes de generar cada ZIP, sube la versión en **los cuatro sitios**:
+  `index.html` (`APP_VERSION` y `APP_RELEASE`), `VERSION`, este README y
+  `server/package.json`.
+- Nombra el ZIP con la versión, por ejemplo: `crm-captacion-v1.0.0.zip`.
+
+### Historial
+
+- **1.0.0** — Versión inicial numerada: búsqueda por palabras clave, selección
+  masiva de leads (asignar, estado, no contactar, exportar y eliminar),
+  historial de búsquedas corregido e integración con Google Maps vía Apify.
+
 ```
 .
 ├─ index.html            # SPA (frontend). Configura la URL del API en Administración → Configuración.
@@ -37,6 +53,47 @@ Este repositorio contiene el frontend estático (`index.html`) **y** el API
 
 `POST /api/search` acepta `{ actor?, input?, params?, persist? }`. Si envías
 `params` (`{ sector, zona, max }`), el servidor construye el input del actor.
+
+## Conectar Google Maps (Apify) y captar leads
+
+El desk de captación pide a Google Maps **solo negocios sin web propia** (sin
+web o únicamente con redes sociales) y los convierte en leads. Hay dos formas
+de conectar la fuente:
+
+1. **Token en el navegador (rápido).** Entra como administrador en
+   **Administración → Configuración**, pega tu token de Apify
+   (`apify_api_…`, se crea en
+   <https://console.apify.com/account/integrations>) y pulsa
+   **Probar conexión**. El token queda en `localStorage` de ese navegador:
+   nunca se escribe en `index.html` ni se incluye en las exportaciones.
+2. **Backend (producción).** Define `APIFY_TOKEN` en el servidor (o en
+   Railway → Variables) y pon la URL del backend en Configuración. El token
+   no llega al navegador; los leads se guardan además en PostgreSQL.
+
+La búsqueda envía al actor `compass/crawler-google-places`:
+
+```json
+{
+  "searchStringsArray": ["Clínica dental Málaga"],
+  "locationQuery": "Málaga, España",
+  "countryCode": "ES",
+  "city": "Málaga",
+  "maxCrawledPlacesPerSearch": 10,
+  "language": "es",
+  "website": "withoutWebsite",
+  "skipClosedPlaces": true
+}
+```
+
+- **Prueba (10)** fija 10 resultados y la zona indicada para gastar pocos
+  créditos. La cobertura por provincias lanza 52 consultas y puede tardar.
+- El cliente descarta los negocios con web propia, los duplicados por
+  `place_id` o teléfono y los que quedan fuera de España.
+- **Sin token:** exporta el dataset del actor en JSON desde Apify y pégalo en
+  **Motor de búsqueda → Importar dataset de Apify**. Se aplican los mismos
+  filtros y no consume créditos.
+- Si Apify rechaza el filtro `website`, se reintenta una vez sin él y el
+  filtrado se hace igualmente en local.
 
 ## Puesta en marcha local
 
@@ -87,5 +144,8 @@ configura la URL del API en **Administración → Configuración**).
 - **PostGIS** queda pospuesto (fase 2); por ahora se usan columnas `lat`/`lng`.
 - **Autenticación JWT** y **telefonía** aún no están implementadas (adaptadores
   preparados en el frontend).
-- Búsquedas largas: hoy son síncronas (`run-sync-get-dataset-items`); en fase 2
-  se moverán a un modo asíncrono con colas (Redis + BullMQ).
+- La búsqueda es síncrona (`run-sync-get-dataset-items`). Para volúmenes
+  grandes, en fase 2 se moverá a un modo asíncrono con colas (Redis + BullMQ).
+- Sin `APIFY_TOKEN` ni URL de backend no se generan leads de prueba: la
+  interfaz avisa y el importador de datasets permite seguir trabajando con
+  exportaciones reales de Apify.

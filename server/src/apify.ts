@@ -10,6 +10,7 @@ export interface ApifyRunBody {
   actor?: string;
   input?: Record<string, unknown>;
   params?: SearchParams;
+  sinWeb?: boolean;
 }
 
 const SOCIAL = [
@@ -42,13 +43,10 @@ export function buildApifyInput(params: SearchParams, limit: number, sinWeb = tr
 
   const input: Record<string, unknown> = {
     searchStringsArray: [q],
-    searchString: q,
-    countryCode: 'es',
+    countryCode: 'ES',
     locationQuery,
     city: zona,
     maxCrawledPlacesPerSearch: limit,
-    maxResults: limit,
-    maxItems: limit,
     language: 'es',
     skipClosedPlaces: true,
     scrapePlaceDetailPage: false
@@ -65,6 +63,85 @@ export class ApifyError extends Error {
     this.name = 'ApifyError';
     this.status = status;
     this.body = body;
+  }
+}
+
+function actorPath(actor: string): string {
+  return actor.includes('/') ? actor.replace('/', '~') : actor;
+}
+
+export interface ApifyStatus {
+  configured: boolean;
+  valid: boolean;
+  actor: string;
+  actorTitle?: string;
+  username?: string;
+  message?: string;
+}
+
+/**
+ * Valida el token y el actor sin ejecutar una búsqueda (no consume créditos
+ * del actor). El token no se devuelve nunca al cliente.
+ */
+export async function checkApify(actorArg?: string): Promise<ApifyStatus> {
+  const actor = String(actorArg || env.apifyActor).trim();
+  if (!hasApifyToken()) {
+    return {
+      configured: false,
+      valid: false,
+      actor,
+      message: 'APIFY_TOKEN no configurado en el servidor'
+    };
+  }
+
+  const ctrl = new AbortController();
+  const to = setTimeout(() => ctrl.abort(), 12000);
+  const headers = { Authorization: `Bearer ${env.apifyToken.trim()}` };
+  try {
+    const userRes = await fetch(`${env.apifyApi}/users/me`, { headers, signal: ctrl.signal });
+    if (!userRes.ok) {
+      const message =
+        userRes.status === 401
+          ? 'Token de Apify inválido o caducado'
+          : `Apify respondió HTTP ${userRes.status}`;
+      return { configured: true, valid: false, actor, message };
+    }
+    const user = (await userRes.json()) as { data?: { username?: string } };
+
+    const path = actorPath(actor);
+    const actorRes = await fetch(`${env.apifyApi}/acts/${encodeURIComponent(path)}`, {
+      headers,
+      signal: ctrl.signal
+    });
+    if (actorRes.status === 404) {
+      return { configured: true, valid: false, actor, message: `Actor no encontrado: ${actor}` };
+    }
+    if (!actorRes.ok) {
+      return {
+        configured: true,
+        valid: false,
+        actor,
+        message: `El actor respondió HTTP ${actorRes.status}`
+      };
+    }
+    const actorInfo = (await actorRes.json()) as { data?: { title?: string; name?: string } };
+    return {
+      configured: true,
+      valid: true,
+      actor: path.replace('~', '/'),
+      actorTitle: actorInfo.data?.title || actorInfo.data?.name,
+      username: user.data?.username
+    };
+  } catch (e) {
+    const err = e as Error;
+    return {
+      configured: true,
+      valid: false,
+      actor,
+      message: err.name === 'AbortError' ? 'tiempo de espera agotado al validar Apify' : err.message
+    };
+  } finally {
+    clearTimeout(to);
   }
 }
 
@@ -105,9 +182,9 @@ export async function runActor(body: ApifyRunBody): Promise<unknown[]> {
   }
 
   const actor = String(body.actor || env.apifyActor).trim();
-  const actorPath = actor.includes('/') ? actor.replace('/', '~') : actor;
+  const path = actorPath(actor);
   const limit = Math.max(1, Math.min(120, body.params?.max || 60));
-  const baseInput = body.input || buildApifyInput(body.params || {}, limit, true);
+  const baseInput = body.input || buildApifyInput(body.params || {}, limit, body.sinWeb !== false);
 
   const ctrl = new AbortController();
   const to = setTimeout(() => ctrl.abort(), env.apifyTimeoutMs);
@@ -115,13 +192,13 @@ export async function runActor(body: ApifyRunBody): Promise<unknown[]> {
   try {
     let data: unknown;
     try {
-      data = await postRun(actorPath, baseInput, ctrl.signal);
+      data = await postRun(path, baseInput, ctrl.signal);
     } catch (e) {
       const err = e as ApifyError;
       if (err.status === 400 && /website/i.test(err.body || '')) {
         const retryInput = { ...baseInput };
         delete (retryInput as { website?: unknown }).website;
-        data = await postRun(actorPath, retryInput, ctrl.signal);
+        data = await postRun(path, retryInput, ctrl.signal);
       } else {
         throw e;
       }

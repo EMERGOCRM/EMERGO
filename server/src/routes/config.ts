@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { env, hasApifyToken } from '../env';
+import { checkApify } from '../apify';
 import { dbEnabled, query } from '../db';
 
 const router = Router();
@@ -47,6 +48,17 @@ router.put('/config', async (req: Request, res: Response) => {
     [JSON.stringify(value)]
   );
   res.json({ ok: true, apify: value });
+});
+
+/**
+ * GET /api/apify/status
+ * Comprueba contra Apify que el token del servidor y el actor son válidos.
+ * No ejecuta el actor ni consume créditos de búsqueda, y nunca devuelve el token.
+ */
+router.get('/apify/status', async (req: Request, res: Response) => {
+  const actor = typeof req.query.actor === 'string' ? req.query.actor : undefined;
+  const status = await checkApify(actor);
+  res.json({ ok: status.valid, ...status });
 });
 
 export default router;
