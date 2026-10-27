@@ -356,7 +356,7 @@ button{font-family:inherit;font-size:inherit;cursor:pointer}
 
 /* Versión visible de la app. Subir en CADA cambio y mantener sincronizados:
    APP_VERSION (aquí), VERSION, README.md y server/package.json. */
-const APP_VERSION='1.3.1';
+const APP_VERSION='1.3.2';
 const APP_RELEASE='27/10/2026';
 
 /* ---------- iconos (familia única, trazo 1.8) ---------- */
@@ -849,6 +849,75 @@ function viewLeadsDashboard(){
 }
 function kpi(label,ic,val,foot){return '<div class="kpi"><div class="klabel">'+icon(ic,'sm')+' '+label+'</div><div class="kval">'+val+'</div><div class="kfoot">'+foot+'</div></div>';}
 
+/* v1.3.2: ordenar por cualquier columna y filtrar por sector, ciudad, búsqueda y fecha de alta. */
+const LEAD_SORTS={
+  created:{label:'fecha de alta',get:function(l){return leadAlta(l)||'';}},
+  score:{label:'lead score',get:function(l){return Number(l.score)||0;}},
+  nombre:{label:'nombre',get:function(l){return normTxt(l.nombre);}},
+  sector:{label:'sector',get:function(l){return normTxt(l.sector);}},
+  ciudad:{label:'ciudad',get:function(l){return normTxt(l.ciudad);}},
+  web:{label:'presencia web',get:function(l){return l.web_tipo==='propia'?2:(l.web_tipo?1:0);}},
+  rating:{label:'valoración',get:function(l){return (Number(l.rating)||0)*100000+(Number(l.resenas)||0);}},
+  estado:{label:'estado',get:function(l){return (ESTADOS[l.estado]||{orden:99}).orden;}},
+  asignado:{label:'asignado',get:function(l){return normTxt(l.asignado_a?userById(l.asignado_a).nombre:'~');}},
+  proxima:{label:'próxima acción',get:function(l){return l.proxima_accion||'9999';}}
+};
+function normTxt(x){return String(x||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
+/* Fecha en que el lead entró al CRM. Si falta, la de su primera actividad. */
+function leadAlta(l){
+  if(l.created_at)return l.created_at;
+  const f=(l.interactions||[]).map(function(i){return i.fecha;}).filter(Boolean).sort()[0];
+  return f||null;
+}
+function leadView(){
+  if(!S.leadView){
+    let v=null;try{v=JSON.parse(localStorage.getItem('od.leadView')||'null');}catch(e){}
+    S.leadView=Object.assign({sort:'created',dir:'desc',sector:'',ciudad:'',search:'',alta:''},v||{});
+    if(!LEAD_SORTS[S.leadView.sort])S.leadView.sort='created';
+  }
+  return S.leadView;
+}
+function saveLeadView(){try{localStorage.setItem('od.leadView',JSON.stringify(S.leadView));}catch(e){}}
+function sortLeads(list){
+  const v=leadView();const get=LEAD_SORTS[v.sort].get;const dir=v.dir==='asc'?1:-1;
+  return list.sort(function(a,b){
+    const x=get(a),y=get(b);
+    if(x<y)return -1*dir;if(x>y)return 1*dir;
+    return normTxt(a.nombre)<normTxt(b.nombre)?-1:1;
+  });
+}
+function sortTh(key,label,cls){
+  const v=leadView();const on=v.sort===key;
+  return '<th class="sortable'+(cls?' '+cls:'')+'" data-sort="'+key+'" title="Ordenar por '+esc(LEAD_SORTS[key].label)+'" style="cursor:pointer;user-select:none;white-space:nowrap">'+label+(on?(' <span style="color:var(--accent)">'+(v.dir==='asc'?'▲':'▼')+'</span>'):' <span style="opacity:.25">↕</span>')+'</th>';
+}
+function altaCutoff(k){
+  const d=new Date();
+  if(k==='hoy'){d.setHours(0,0,0,0);return d.toISOString();}
+  if(k==='7')return new Date(Date.now()-7*864e5).toISOString();
+  if(k==='30')return new Date(Date.now()-30*864e5).toISOString();
+  return '';
+}
+function leadSelectFilters(all){
+  const v=leadView();
+  function opts(values,cur,empty){
+    const cnt={};values.forEach(function(x){if(x)cnt[x]=(cnt[x]||0)+1;});
+    const keys=Object.keys(cnt).sort(function(a,b){return normTxt(a)<normTxt(b)?-1:1;});
+    return '<option value="">'+empty+'</option>'+keys.map(function(k){return '<option value="'+esc(k)+'"'+(k===cur?' selected':'')+'>'+esc(k)+' · '+cnt[k]+'</option>';}).join('');
+  }
+  const searches=DB.searches.slice().sort(function(a,b){return new Date(b.fecha)-new Date(a.fecha);});
+  const sOpts='<option value="">Todas las búsquedas</option>'+searches.map(function(s){const n=all.filter(function(l){return l.search_id===s.id;}).length;return '<option value="'+esc(s.id)+'"'+(v.search===s.id?' selected':'')+'>'+esc(s.sector)+(s.zona?(' · '+esc(s.zona)):'')+' · '+esc(fmtDate(s.fecha))+' · '+n+'</option>';}).join('');
+  const sel='class="select" style="height:34px;min-width:150px;max-width:260px;font-size:13px"';
+  const active=v.sector||v.ciudad||v.search||v.alta;
+  return '<div class="chipbar mb16" style="gap:8px;flex-wrap:wrap;align-items:center">'+
+    '<select '+sel+' id="lfSector" aria-label="Filtrar por sector">'+opts(all.map(function(l){return l.sector;}),v.sector,'Todos los sectores')+'</select>'+
+    '<select '+sel+' id="lfCiudad" aria-label="Filtrar por ciudad">'+opts(all.map(function(l){return l.ciudad;}),v.ciudad,'Todas las ciudades')+'</select>'+
+    '<select '+sel+' id="lfAlta" aria-label="Filtrar por fecha de alta">'+[['','Cualquier fecha de alta'],['hoy','Dados de alta hoy'],['7','Últimos 7 días'],['30','Últimos 30 días']].map(function(o){return '<option value="'+o[0]+'"'+(v.alta===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select>'+
+    (searches.length?'<select '+sel+' id="lfSearch" aria-label="Filtrar por búsqueda">'+sOpts+'</select>':'')+
+    '<select '+sel+' id="lfSort" aria-label="Ordenar por">'+Object.keys(LEAD_SORTS).map(function(k){return '<option value="'+k+'"'+(v.sort===k?' selected':'')+'>Ordenar: '+esc(LEAD_SORTS[k].label)+'</option>';}).join('')+'</select>'+
+    '<button class="btn ghost sm" id="lfDir" title="Invertir el orden">'+(v.dir==='asc'?'▲ Ascendente':'▼ Descendente')+'</button>'+
+    (active?'<button class="btn ghost sm" id="lfClear">'+icon('x','sm')+' Quitar filtros</button>':'')+
+  '</div>';
+}
 function viewLeadList(){
   const q=S.listQuery.toLowerCase();
   let leads=visibleLeads().slice();
@@ -858,14 +927,19 @@ function viewLeadList(){
   if(wf==='sin_web')leads=leads.filter(l=>!l.web_tipo);
   else if(wf==='solo_redes')leads=leads.filter(l=>l.web_tipo&&l.web_tipo!=='propia');
   else if(wf==='con_web')leads=leads.filter(l=>l.web_tipo==='propia');
-  if(q)leads=leads.filter(l=>l.nombre.toLowerCase().includes(q)||l.sector.toLowerCase().includes(q)||l.ciudad.toLowerCase().includes(q)||l.telefono.includes(q));
-  leads.sort((a,b)=>b.score-a.score);
+  if(q)leads=leads.filter(l=>String(l.nombre||'').toLowerCase().includes(q)||String(l.sector||'').toLowerCase().includes(q)||String(l.ciudad||'').toLowerCase().includes(q)||String(l.telefono||'').includes(q));
+  const lv=leadView();
+  if(lv.sector)leads=leads.filter(l=>l.sector===lv.sector);
+  if(lv.ciudad)leads=leads.filter(l=>l.ciudad===lv.ciudad);
+  if(lv.search)leads=leads.filter(l=>l.search_id===lv.search);
+  if(lv.alta){const cut=altaCutoff(lv.alta);leads=leads.filter(l=>{const a=leadAlta(l);return a&&a>=cut;});}
+  sortLeads(leads);
   const selCount=leadSelIds().length;
   const allSel=leads.length>0&&leads.every(function(l){return !!(S.leadSel||{})[l.id];});
   const all=visibleLeads();
   const counts=ESTADOS_LEAD.reduce((m,e)=>{m[e]=all.filter(l=>l.estado===e).length;return m;},{});
   const wCounts={sin_web:all.filter(l=>!l.web_tipo).length,solo_redes:all.filter(l=>l.web_tipo&&l.web_tipo!=='propia').length,con_web:all.filter(l=>l.web_tipo==='propia').length};
-  return '<div class="page-head"><div><h1>Leads</h1><div class="page-sub">'+leads.length+' registros en tu ámbito · ordenados por lead score</div></div>'+
+  return '<div class="page-head"><div><h1>Leads</h1><div class="page-sub">'+leads.length+' registros en tu ámbito · ordenados por '+esc(LEAD_SORTS[lv.sort].label)+' ('+(lv.dir==='asc'?'ascendente':'descendente')+')</div></div>'+
     '<div class="row gap8">'+(canReassign()?('<button class="btn outline" data-bulkassign>'+icon('users','sm')+' Asignar a comercial</button>'):'')+'<button class="btn ghost" id="selectAllBtn">'+icon('check','sm')+' Seleccionar visibles</button><button class="btn outline" id="exportLeads">'+icon('download','sm')+' Exportar CSV</button>'+(isAdmin()?('<button class="btn primary" data-go="#/leads/search">'+icon('plus','sm')+' Buscar nuevos</button>'):'')+'</div></div>'+
   '<div class="chipbar mb8"><button class="pill-btn '+(f==='todos'?'on':'')+'" data-filter="todos">Todos · '+all.length+'</button>'+
     ESTADOS_LEAD.map(e=>counts[e]?'<button class="pill-btn '+(f===e?'on':'')+'" data-filter="'+e+'">'+ESTADOS[e].label+' · '+counts[e]+'</button>':'').join('')+'</div>'+
@@ -873,6 +947,7 @@ function viewLeadList(){
     '<button class="pill-btn '+(wf==='sin_web'?'on':'')+'" data-webfilter="sin_web">'+icon('globe','sm')+' Sin web · '+wCounts.sin_web+'</button>'+
     '<button class="pill-btn '+(wf==='solo_redes'?'on':'')+'" data-webfilter="solo_redes">'+icon('instagram','sm')+' Solo redes · '+wCounts.solo_redes+'</button>'+
     (wCounts.con_web?'<button class="pill-btn '+(wf==='con_web'?'on':'')+'" data-webfilter="con_web">Con web · '+wCounts.con_web+'</button>':'')+'</div>'+
+  leadSelectFilters(all)+
   '<div class="card bulkbar mb16" id="bulkBar" style="display:'+(selCount?'':'none')+'"><div class="card-body"><div class="row gap8 wrap"><b><span id="bulkCount">'+selCount+'</span> seleccionados</b><span class="fill"></span>'+
     (canReassign()?'<button class="btn outline sm" id="bulkAssign">'+icon('users','sm')+' Asignar</button>':'')+
     '<button class="btn outline sm" id="bulkStatus">'+icon('check','sm')+' Cambiar estado</button>'+
@@ -881,7 +956,7 @@ function viewLeadList(){
     (isAdmin()?'<button class="btn ghost sm" id="bulkDelete" style="color:var(--danger)">'+icon('trash','sm')+' Eliminar</button>':'')+
     '<button class="btn ghost sm" id="bulkClear">'+icon('x','sm')+' Quitar selección</button>'+
   '</div></div></div>'+
-  '<div class="card tbl-wrap">'+(leads.length?'<table class="table"><thead><tr><th class="selcol"><input type="checkbox" id="selAll" aria-label="Seleccionar todos los leads visibles"'+(allSel?' checked':'')+'></th><th></th><th>Negocio</th><th>Sector</th><th>Ciudad</th><th>Web</th><th>Reputación</th><th>Estado</th><th>Asignado</th><th>Próxima</th></tr></thead><tbody>'+
+  '<div class="card tbl-wrap">'+(leads.length?'<table class="table"><thead><tr><th class="selcol"><input type="checkbox" id="selAll" aria-label="Seleccionar todos los leads visibles"'+(allSel?' checked':'')+'></th>'+sortTh('score','')+sortTh('nombre','Negocio')+sortTh('sector','Sector')+sortTh('ciudad','Ciudad')+sortTh('web','Web')+sortTh('rating','Reputación')+sortTh('estado','Estado')+sortTh('asignado','Asignado')+sortTh('proxima','Próxima')+sortTh('created','Alta')+'</tr></thead><tbody>'+
     leads.map(l=>'<tr class="clickable" data-lead-row="'+l.id+'" data-go="#/leads/'+l.id+'">'+
       '<td class="selcol"><input type="checkbox" data-select="'+l.id+'" aria-label="Seleccionar '+esc(l.nombre)+'"'+((S.leadSel||{})[l.id]?' checked':'')+'></td>'+
       '<td>'+scoreBadge(l.score)+'</td>'+
@@ -893,6 +968,7 @@ function viewLeadList(){
       '<td>'+stPill(l.estado)+'</td>'+
       '<td class="small">'+esc(userById(l.asignado_a).nombre.split(' ')[0])+'</td>'+
       '<td class="small '+(l.proxima_accion&&isToday(l.proxima_accion)?'strong':'muted')+'">'+(l.proxima_accion?fmtDate(l.proxima_accion):'—')+'</td>'+
+      '<td class="small nowrap muted" title="Fecha en que entró al CRM">'+(leadAlta(l)?esc(fmtDateTime(leadAlta(l))):'—')+'</td>'+
     '</tr>').join('')+'</tbody></table>':'<div class="empty">'+icon('filter','lg')+'<p>No hay leads que coincidan con este filtro.</p>'+(S.user.rol==='comercial'?'<p class="small muted">El administrador te irá asignando leads a tu portafolio.</p>':'')+'</div>')+'</div>';
 }
 
@@ -1781,7 +1857,7 @@ function finishSearchJob(newCount,dup,p,label,job){
     const old=document.getElementById('jobResultsBtn');if(old)old.remove();
     const oldOffer=document.getElementById('jobOfferBtn');if(oldOffer)oldOffer.remove();
     const oldUndo=document.getElementById('jobUndoBtn');if(oldUndo)oldUndo.remove();
-    const bar=document.createElement('button');bar.id='jobResultsBtn';bar.className='btn primary mt16';bar.innerHTML=icon('arrowright','sm')+' Ver leads importados';bar.addEventListener('click',function(){S.job=null;S.filters.lead='nuevo';go('#/leads');});
+    const bar=document.createElement('button');bar.id='jobResultsBtn';bar.className='btn primary mt16';bar.innerHTML=icon('arrowright','sm')+' Ver leads importados';bar.addEventListener('click',function(){S.job=null;S.filters.lead='todos';const v=leadView();const last=DB.searches.slice().sort(function(a,b){return new Date(b.fecha)-new Date(a.fecha);})[0];v.search=last?last.id:'';v.sort='created';v.dir='desc';saveLeadView();go('#/leads');});
     body.appendChild(bar);
     if(newCount){
       const offer=document.createElement('button');offer.id='jobOfferBtn';offer.className='btn outline mt16';offer.style.marginLeft='8px';offer.innerHTML=icon('globe','sm')+' Ofrecer web + CRM';offer.addEventListener('click',function(){S.job=null;S.filters.lead='nuevo';S.filters.web='todos';go('#/leads');});
@@ -1969,9 +2045,12 @@ function loadDatasetFile(input){
 function bindDelegates(){
   document.addEventListener('click',function(e){
     if(e.target.closest('[data-select],#selAll'))return;
-    const t=e.target.closest('[data-go],[data-filter],[data-webfilter],[data-bulkassign],[data-tab],[data-estado],[data-call],[data-demo],[data-send],[data-addnote],[data-ticket],[data-edituser],[data-tfilter],[data-newticket],[data-toggle-nocontact],[data-reassign],[data-next],[data-score],[data-newarticle],[data-kbview],[data-source],[data-webhooktest],[data-notif],[data-demoopen],[data-web],[data-copyprompt],[data-del-lead],[data-del-search],[data-undo-search],#exportLeads,#exportClients,#runSearch,#resetSearch,#quickSearch,#importDataset,#newUser,#apifySave,#apifyClear,#apifyTest,#apiSave,#apiClear,#apiLogin,#apiLogout,#syncNow,#aiSave,#aiClear,#dbExport,#dbImportBtn,#bulkAssign,#bulkStatus,#bulkNoContact,#bulkExport,#bulkDelete,#bulkClear,#selectAllBtn,#undoLastSearch,#clearSearchHistory');
+    const t=e.target.closest('[data-go],[data-filter],[data-webfilter],[data-bulkassign],[data-tab],[data-estado],[data-call],[data-demo],[data-send],[data-addnote],[data-ticket],[data-edituser],[data-tfilter],[data-newticket],[data-toggle-nocontact],[data-reassign],[data-next],[data-score],[data-newarticle],[data-kbview],[data-source],[data-webhooktest],[data-notif],[data-demoopen],[data-web],[data-copyprompt],[data-del-lead],[data-del-search],[data-undo-search],[data-sort],#lfDir,#lfClear,#exportLeads,#exportClients,#runSearch,#resetSearch,#quickSearch,#importDataset,#newUser,#apifySave,#apifyClear,#apifyTest,#apiSave,#apiClear,#apiLogin,#apiLogout,#syncNow,#aiSave,#aiClear,#dbExport,#dbImportBtn,#bulkAssign,#bulkStatus,#bulkNoContact,#bulkExport,#bulkDelete,#bulkClear,#selectAllBtn,#undoLastSearch,#clearSearchHistory');
     if(!t)return;
     if(t.hasAttribute('data-go')){go(t.getAttribute('data-go'));return;}
+    if(t.hasAttribute('data-sort')){const v=leadView();const k=t.getAttribute('data-sort');if(v.sort===k)v.dir=v.dir==='asc'?'desc':'asc';else{v.sort=k;v.dir=(['nombre','sector','ciudad','asignado','proxima','estado'].indexOf(k)>=0)?'asc':'desc';}saveLeadView();render();return;}
+    if(t.id==='lfDir'){const v=leadView();v.dir=v.dir==='asc'?'desc':'asc';saveLeadView();render();return;}
+    if(t.id==='lfClear'){const v=leadView();v.sector='';v.ciudad='';v.search='';v.alta='';clearLeadSel();saveLeadView();render();return;}
     if(t.hasAttribute('data-filter')){clearLeadSel();S.filters.lead=t.getAttribute('data-filter');render();return;}
     if(t.hasAttribute('data-webfilter')){clearLeadSel();S.filters.web=t.getAttribute('data-webfilter');render();return;}
     if(t.hasAttribute('data-bulkassign')){openBulkAssignModal(leadSelIds());return;}
@@ -2034,6 +2113,11 @@ function bindDelegates(){
   });
   document.addEventListener('change',function(e){
     if(e.target.id==='selAll'){selectAllVisible(e.target.checked);return;}
+    if(['lfSector','lfCiudad','lfAlta','lfSearch','lfSort'].indexOf(e.target.id)>=0){
+      const v=leadView();const k={lfSector:'sector',lfCiudad:'ciudad',lfAlta:'alta',lfSearch:'search',lfSort:'sort'}[e.target.id];
+      v[k]=e.target.value;if(k==='sort')v.dir=(['nombre','sector','ciudad','asignado','proxima','estado'].indexOf(v.sort)>=0)?'asc':'desc';
+      clearLeadSel();saveLeadView();render();return;
+    }
     if(e.target.hasAttribute&&e.target.hasAttribute('data-select')){
       const id=e.target.getAttribute('data-select');
       if(!S.leadSel)S.leadSel={};
@@ -2068,7 +2152,7 @@ function exportCSV(kind,subset){
   let rows,csv;
   if(kind==='leads'){
     rows=(Array.isArray(subset)&&subset.length)?subset:visibleLeads();
-    csv=[['id','place_id','nombre','sector','ciudad','estado','score','rating','resenas','telefono','email','web','asignado']].concat(rows.map(l=>[l.id,l.place_id,l.nombre,l.sector,l.ciudad,ESTADOS[l.estado].label,l.score,l.rating,l.resenas,l.telefono,l.email,webLabel(l),userById(l.asignado_a).nombre])).map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
+    csv=[['id','place_id','nombre','sector','ciudad','estado','score','rating','resenas','telefono','email','web','asignado','fecha_alta','busqueda']].concat(rows.map(l=>{const s=l.search_id&&DB.searches.find(x=>x.id===l.search_id);return [l.id,l.place_id,l.nombre,l.sector,l.ciudad,(ESTADOS[l.estado]||{label:l.estado}).label,l.score,l.rating,l.resenas,l.telefono,l.email,webLabel(l),userById(l.asignado_a).nombre,leadAlta(l)?new Date(leadAlta(l)).toLocaleString('es-ES'):'',s?(s.sector+' · '+(s.zona||'')+' · '+fmtDate(s.fecha)):''];})).map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
   }else{
     rows=DB.customers;
     csv=[['id','nombre','plan','precio','alta','renovacion','estado']].concat(rows.map(c=>[c.id,c.nombre,c.plan,c.precio,fmtDate(c.fecha_alta),fmtDate(c.renovacion),c.estado])).map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
@@ -2974,7 +3058,7 @@ function leadPayload(l){
     telefono:l.telefono,email:l.email,web_tipo:l.web_tipo,redes:l.redes,rating:l.rating,resenas:l.resenas,horario:l.horario,maps:l.maps,
     descripcion_ia:l.descripcion_ia,score:l.score,fuente:l.fuente,image_url:l.image_url||null,estado:l.estado,motivo_descarte:l.motivo_descarte,
     asignado_a:l.asignado_a,search_id:l.search_id,proxima_accion:localFields(l).proxima_accion,proxima_tipo:l.proxima_tipo,intentos:l.intentos,
-    no_contactar:!!l.no_contactar,raw:PENDING_RAW[l.id]||undefined};
+    no_contactar:!!l.no_contactar,created_at:leadAlta(l),raw:PENDING_RAW[l.id]||undefined};
 }
 function fromServerLead(r){
   return {id:r.id,server_id:r.id,place_id:r.place_id,nombre:r.nombre,sector:r.sector||'Negocio',direccion:r.direccion||'',ciudad:r.ciudad||'',
@@ -3144,7 +3228,25 @@ async function pullChanges(){
     delete SYNC.refetch[sid];
   }
   if(serverTime)st.lastPull=new Date(new Date(serverTime).getTime()-5000).toISOString();
+  changed+=await pullSearches();
   return changed;
+}
+/* Historial de búsquedas del servidor (admin/supervisor: de todo el equipo). */
+async function pullSearches(){
+  const j=await apiJSON('GET','/api/searches?limit=1000');
+  const srv=j.searches||[];
+  const bySid={};DB.leads.forEach(function(l){if(l.server_id)bySid[l.server_id]=l.id;});
+  const before=JSON.stringify(DB.searches.map(function(x){return x.id+':'+x.nuevos;}));
+  const pendingLocal=DB.searches.filter(function(x){return !x.synced;});
+  const local={};DB.searches.forEach(function(x){local[x.id]=x;});
+  const merged=srv.map(function(r){
+    const prev=local[r.id]||{};
+    return Object.assign({},prev,{id:r.id,user_id:r.user_id,sector:r.sector,zona:r.zona,radio:r.radio,estado:r.estado||'completada',resultados:r.resultados||0,nuevos:r.nuevos||0,duplicados:r.duplicados||0,
+      fecha:r.created_at,programada:r.programada,proveedor:r.proveedor,params:r.params,stats:r.stats,synced:1,
+      leadIds:(Array.isArray(r.lead_ids)?r.lead_ids:[]).map(function(sid){return bySid[sid]||sid;})});
+  });
+  DB.searches=pendingLocal.concat(merged);
+  return JSON.stringify(DB.searches.map(function(x){return x.id+':'+x.nuevos;}))!==before?1:0;
 }
 async function checkVisibleIds(){
   const st=syncState();
@@ -3185,7 +3287,9 @@ async function syncNow(){
     if(pulled||SYNC.needRender){
       SYNC.needRender=false;
       const a=document.activeElement;const app=document.getElementById('app');
-      const typing=a&&app&&app.contains(a)&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);
+      const typing=(a&&app&&app.contains(a)&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))||
+        /* En el buscador no se redibuja: se perdería el panel con los resultados de la búsqueda. */
+        String(S.route||'').indexOf('#/leads/search')===0;
       if(typing)SYNC.needRender=true;else{SYNC.inSync=true;render();SYNC.inSync=false;}
     }
     if(SYNC.again){SYNC.again=false;setTimeout(syncNow,400);}

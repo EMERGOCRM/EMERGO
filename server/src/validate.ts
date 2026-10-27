@@ -155,6 +155,7 @@ export interface LeadImport {
   proxima_tipo: string | null;
   intentos: number;
   no_contactar: boolean;
+  created_at: string | null;
 }
 
 /**
@@ -210,7 +211,12 @@ export function normalizeImport(input: unknown): { lead?: LeadImport; error?: st
       proxima_accion: optDate(l.proxima_accion),
       proxima_tipo: optStr(l.proxima_tipo, 40),
       intentos: optInt(l.intentos) ?? 0,
-      no_contactar: l.no_contactar === true || l.no_contactar === 'true'
+      no_contactar: l.no_contactar === true || l.no_contactar === 'true',
+      // Fecha real de alta (leads que ya estaban en el navegador): nunca en el futuro.
+      created_at: (() => {
+        const d = optDate(l.created_at);
+        return d && new Date(d).getTime() <= Date.now() + 60_000 ? d : null;
+      })()
     }
   };
 }

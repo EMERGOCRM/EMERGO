@@ -599,3 +599,18 @@ test('borrar del historial: el dueño puede, otro comercial no', async () => {
   assert.equal((await call('DELETE', '/api/searches/s-hist', { token: tokens.javier })).status, 403);
   assert.equal((await call('DELETE', '/api/searches/s-hist', { token: tokens.lucia })).status, 200);
 });
+
+test('al subir leads antiguos se conserva su fecha de alta (nunca en el futuro)', async () => {
+  const r = await call('POST', '/api/leads', {
+    token: tokens.lucia,
+    body: [
+      { id: 'F1', place_id: 'P_F1', nombre: 'Antiguo', created_at: '2026-03-05T09:00:00Z' },
+      { id: 'F2', place_id: 'P_F2', nombre: 'Futuro', created_at: '2099-01-01T00:00:00Z' },
+      { id: 'F3', place_id: 'P_F3', nombre: 'Sin fecha' }
+    ]
+  });
+  const [a, f, n] = r.json.leads;
+  assert.equal(new Date(a.created_at).toISOString(), '2026-03-05T09:00:00.000Z');
+  assert.ok(new Date(f.created_at).getTime() <= Date.now() + 1000);
+  assert.ok(Math.abs(new Date(n.created_at).getTime() - Date.now()) < 60000);
+});

@@ -6,16 +6,27 @@ Este repositorio contiene el frontend estático (`index.html`) **y** el API
 
 ## Versión
 
-**Versión actual: 1.3.1** (27/10/2026)
+**Versión actual: 1.3.2** (27/10/2026)
 
 - Se muestra en la app (sidebar, login y Configuración) y en `VERSION`.
 - Antes de generar cada ZIP, sube la versión en **los cuatro sitios**:
   `index.html` (`APP_VERSION` y `APP_RELEASE`), `VERSION`, este README y
   `server/package.json`.
-- Nombra el ZIP con la versión, por ejemplo: `crm-captacion-v1.3.1.zip`.
+- Nombra el ZIP con la versión, por ejemplo: `crm-captacion-v1.3.2.zip`.
 
 ### Historial
 
+- **1.3.2** — Ordenar y filtrar leads:
+  - Columna **Alta** (fecha y hora en que el lead entró al CRM) y orden por
+    cualquier columna haciendo clic en la cabecera: alta, score, nombre,
+    sector, ciudad, web, reputación, estado, asignado y próxima acción.
+  - Filtros por **sector, ciudad, fecha de alta** (hoy, 7 y 30 días) y
+    **búsqueda** concreta. El orden y los filtros se recuerdan.
+  - «Ver leads importados» al acabar una búsqueda muestra solo los de esa búsqueda.
+  - Los leads que ya estaban en el navegador conservan su fecha real de alta al
+    subirse al servidor. El CSV incluye fecha de alta y búsqueda.
+  - El historial de búsquedas se descarga del servidor (admin ve el de todo el equipo).
+  - Corrige que la sincronización borrase el panel de resultados de la búsqueda.
 - **1.3.1** — Deshacer búsquedas para todo el equipo:
   - «Deshacer» en **cada** búsqueda del historial (no solo la última). Se
     hace en el servidor: borra los leads que trajo y que nadie ha trabajado y

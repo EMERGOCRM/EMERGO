@@ -111,10 +111,10 @@ const INSERT = `
     id, nombre, sector, direccion, ciudad, lat, lng, telefono, telefono_norm, email,
     web_detectada, web_tipo, redes, rating, resenas, horario, maps, fotos, raw, image_url,
     place_id, descripcion_ia, score, fuente, estado, motivo_descarte, asignado_a, search_id,
-    proxima_accion, proxima_tipo, intentos, no_contactar, client_ref, created_by
+    proxima_accion, proxima_tipo, intentos, no_contactar, client_ref, created_by, created_at
   ) VALUES (
     $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14,$15,$16,$17,$18::jsonb,$19::jsonb,$20,
-    $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34
+    $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,COALESCE($35::timestamptz, now())
   )
   ON CONFLICT (place_id) WHERE place_id IS NOT NULL DO UPDATE SET ${MAPS_REFRESH}
   RETURNING ${LIST_COLS}, (xmax = 0) AS inserted`;
@@ -195,7 +195,7 @@ router.post(
           crypto.randomUUID(), ...mapsParams('', n).slice(1),
           n.place_id, n.descripcion_ia, n.score, n.fuente, n.estado, n.motivo_descarte,
           n.asignado_a, n.search_id, n.proxima_accion, n.proxima_tipo, n.intentos,
-          n.no_contactar, n.client_ref, user.id
+          n.no_contactar, n.client_ref, user.id, n.created_at
         ]);
         const { inserted, ...row } = r.rows[0];
         saved.push({ ...row, client_ref: n.client_ref, duplicate: !inserted });
