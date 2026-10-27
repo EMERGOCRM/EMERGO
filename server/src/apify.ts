@@ -8,7 +8,6 @@ export interface SearchParams {
 
 export interface ApifyRunBody {
   actor?: string;
-  input?: Record<string, unknown>;
   params?: SearchParams;
   sinWeb?: boolean;
 }
@@ -184,9 +183,8 @@ export async function runActor(body: ApifyRunBody): Promise<unknown[]> {
   const actor = String(body.actor || env.apifyActor).trim();
   const path = actorPath(actor);
   const limit = Math.max(1, Math.min(120, body.params?.max || 60));
-  const baseInput: Record<string, unknown> = {
-    ...(body.input || buildApifyInput(body.params || {}, limit, body.sinWeb !== false))
-  };
+  // El input lo construye siempre el servidor a partir de params validados.
+  const baseInput: Record<string, unknown> = buildApifyInput(body.params || {}, limit, body.sinWeb !== false);
   if (typeof baseInput.countryCode === 'string') {
     baseInput.countryCode = baseInput.countryCode.toLowerCase();
   }

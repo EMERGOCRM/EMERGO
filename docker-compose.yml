@@ -26,6 +26,12 @@ services:
       APIFY_TOKEN: ${APIFY_TOKEN:-}
       APIFY_DEFAULT_ACTOR: ${APIFY_DEFAULT_ACTOR:-compass/crawler-google-places}
       CORS_ORIGIN: "*"
+      AUTH_SECRET: ${AUTH_SECRET:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_ID: ${ADMIN_ID:-u1}
+      TRUST_PROXY: "0"
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     ports:
       - "3000:3000"
     depends_on:

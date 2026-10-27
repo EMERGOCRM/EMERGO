@@ -356,8 +356,8 @@ button{font-family:inherit;font-size:inherit;cursor:pointer}
 
 /* Versión visible de la app. Subir en CADA cambio y mantener sincronizados:
    APP_VERSION (aquí), VERSION, README.md y server/package.json. */
-const APP_VERSION='1.1.0';
-const APP_RELEASE='18/10/2026';
+const APP_VERSION='1.2.0';
+const APP_RELEASE='27/10/2026';
 
 /* ---------- iconos (familia única, trazo 1.8) ---------- */
 const ICONS = {
@@ -1268,7 +1268,13 @@ function viewAdminSettings(){
       card2('Backend y fuente de datos', 'layers', '<p class="small muted" style="margin-top:0">Adaptador principal activo. Pulsa para cambiarlo (interfaz de adaptadores común).</p>'+FUENTES.map((f,i)=>'<button class="row gap12" data-source="'+i+'" style="width:100%;text-align:left;background:none;border:none;border-bottom:1px solid var(--border);padding:9px 0;cursor:pointer"><span class="fill">'+esc(f)+'</span>'+(i===st.fuente?'<span class="badge" style="background:var(--ok-tint);color:var(--ok)">Principal</span>':'<span class="badge">Usar</span>')+'</button>').join('')+
         '<div class="notice mt16" style="border-color:'+(backendConfigured()?'var(--ok)':'var(--border-2)')+'">'+icon('plug','sm')+'<span class="small"><b>Backend</b> · '+(backendConfigured()?('conectado a <span class="mono">'+esc(apiBase())+'</span>. El token de Apify vive en el servidor y los leads se guardan en PostgreSQL.'):'sin URL: el navegador llama a Apify directamente con el token de arriba y los leads quedan en este navegador.')+'</span></div>'+
         field('Backend / API URL','<input class="input" id="apiBase" placeholder="https://tu-app.up.railway.app" value="'+esc(st.apiBase||'')+'">','Si la rellenas, las búsquedas y los leads pasan por el backend (recomendado en producción). Déjala vacía para usar el token del navegador.')+
-        '<div class="row gap8 mt8"><button class="btn primary" id="apiSave">'+icon('check','sm')+' Guardar backend</button><button class="btn ghost" id="apiClear">Quitar backend</button></div>')+
+        '<div class="row gap8 mt8"><button class="btn primary" id="apiSave">'+icon('check','sm')+' Guardar backend</button><button class="btn ghost" id="apiClear">Quitar backend</button></div>'+
+        (backendConfigured()?(backendLogged()?
+          ('<div class="notice mt16" style="border-color:var(--ok)">'+icon('check','sm')+'<span class="small">Sesión del backend: <b>'+esc((st.apiUser&&st.apiUser.nombre)||'')+'</b> ('+esc((st.apiUser&&st.apiUser.rol)||'')+')'+(st.apiTokenExp?(' · caduca '+esc(fmtDateTime(st.apiTokenExp))):'')+'</span></div><div class="row gap8 mt8"><button class="btn ghost" id="apiLogout">Cerrar sesión del backend</button></div>'):
+          ('<div class="notice mt16">'+icon('shield','sm')+'<span class="small">El backend exige sesión. Usa tu usuario del servidor (el primer admin se crea con <span class="mono">ADMIN_EMAIL</span> y <span class="mono">ADMIN_PASSWORD</span>).</span></div>'+
+           field('Email','<input class="input" id="apiEmail" type="email" autocomplete="username" value="'+esc((S.user&&S.user.email)||'')+'">')+
+           field('Contraseña','<input class="input" id="apiPass" type="password" autocomplete="current-password">')+
+           '<div class="row gap8 mt8"><button class="btn primary" id="apiLogin">'+icon('check','sm')+' Iniciar sesión</button></div>')):''))+
       card2('Telefonía (preparada, sin conectar)', 'phone', '<p class="small muted" style="margin-top:0">Capa <span class="mono">TelephonyProvider</span> con métodos definidos y webhooks vacíos. Compatible con Twilio, Aircall, Ringover y Zadarma.</p>'+
         field('Proveedor activo','<select class="select" id="telProvider">'+['manual','Twilio','Aircall','Ringover','Zadarma'].map(p=>'<option value="'+p+'" '+(st.provider===p?'selected':'')+'>'+p+'</option>').join('')+'</select>')+
         '<div class="notice mb8 mono tiny">POST /webhooks/telephony</div>'+
@@ -1314,6 +1320,36 @@ function apifySettings(){return settings();}
 function apifyConfigured(){const t=apifySettings().apifyToken;return !!(t&&String(t).trim());}
 function apiBase(){const b=settings().apiBase;return (b&&String(b).trim())?String(b).trim().replace(/\/+$/,''):'';}
 function backendConfigured(){return !!apiBase();}
+/* Sesión del backend (v1.2.0): todas las llamadas a /api llevan el token. */
+function apiToken(){const s=settings();if(!s.apiToken)return '';if(s.apiTokenExp&&new Date(s.apiTokenExp).getTime()<Date.now())return '';return s.apiToken;}
+function backendLogged(){return !!apiToken();}
+function apiHeaders(json){const h={};if(json!==false)h['Content-Type']='application/json';const t=apiToken();if(t)h['Authorization']='Bearer '+t;return h;}
+function apiAuthFailed(res){
+  if(res&&res.status===401){
+    const s=settings();s.apiToken='';s.apiUser=null;s.apiTokenExp='';persistSettings();
+    toast('Sesión del backend caducada: inicia sesión en Administración → Configuración','warn');
+    return true;
+  }
+  return false;
+}
+function backendLogin(){
+  const base=apiBase();
+  if(!base){toast('Primero guarda la URL del backend','warn');return;}
+  const em=document.getElementById('apiEmail'),pw=document.getElementById('apiPass');
+  const email=em?String(em.value||'').trim():'',password=pw?String(pw.value||''):'';
+  if(!email||!password){toast('Indica email y contraseña del backend','warn');return;}
+  fetchJsonTimeout(base+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,password:password})},12000).then(function(r){
+    const j=r.j||{};
+    if(!r.res.ok||!j.token){toast('No se pudo iniciar sesión: '+(j.error||('HTTP '+r.res.status)),'err');return;}
+    const s=settings();s.apiToken=j.token;s.apiTokenExp=j.expires_at||'';s.apiUser=j.user||null;persistSettings();
+    audits('settings','update',null,{backend:'sesión iniciada '+email});
+    toast('Sesión iniciada en el backend como '+((j.user&&j.user.nombre)||email),'ok');render();
+  }).catch(function(e){toast('No se pudo contactar con el backend: '+(e&&e.name==='AbortError'?'tiempo de espera agotado':(e&&e.message)),'err');});
+}
+function backendLogout(){
+  const s=settings();s.apiToken='';s.apiUser=null;s.apiTokenExp='';persistSettings();
+  toast('Sesión del backend cerrada','warn');render();
+}
 function sourceReady(){return apifyConfigured()||backendConfigured();}
 function apifyActorPath(actor){const a=String(actor||APIFY_DEFAULT_ACTOR).trim();return a.indexOf('/')>=0?a.replace('/','~'):a;}
 function apifyStateMeta(){
@@ -1366,8 +1402,9 @@ function testApifyConnection(){
   }
   if(backendConfigured()){
     const actor=String(st.apifyActor||APIFY_DEFAULT_ACTOR).trim();
-    fetchJsonTimeout(apiBase()+'/api/apify/status?actor='+encodeURIComponent(actor),{},12000).then(function(r){
+    fetchJsonTimeout(apiBase()+'/api/apify/status',{headers:apiHeaders(false)},12000).then(function(r){
       const j=r.j||{};
+      if(apiAuthFailed(r.res)){finish(false,'inicia sesión en el backend','sesión no válida');return;}
       if(r.res.ok&&j.valid)finish(true,'token del servidor validado',j.actor||'');
       else finish(false,(j.message||('HTTP '+r.res.status)),j.message||'');
     }).catch(function(e){finish(false,'no se pudo contactar con el backend',e&&e.name==='AbortError'?'tiempo de espera agotado':e.message);});
@@ -1427,8 +1464,8 @@ function collectSocials(it,web){
 function socialIcon(r){return (r==='instagram'||r==='facebook')?r:'globe';}
 function normPhone(p){return String(p||'').replace(/[^0-9]/g,'');}
 function numOr(v,d){const n=parseFloat(v);return isNaN(n)?(d||0):n;}
-function persistSettings(){try{const s=settings();localStorage.setItem('od.settings',JSON.stringify({fuente:s.fuente,provider:s.provider,apifyToken:s.apifyToken,apifyActor:s.apifyActor,apiBase:s.apiBase,apifyOk:s.apifyOk,apifyCheckedAt:s.apifyCheckedAt,apifyDetail:s.apifyDetail,aiBase:s.aiBase,aiKey:s.aiKey,aiModel:s.aiModel}));}catch(e){}}
-function restoreSettings(){try{const raw=localStorage.getItem('od.settings');if(!raw)return;const o=JSON.parse(raw);const s=settings();if(typeof o.fuente==='number'&&o.fuente>=0&&o.fuente<FUENTES.length)s.fuente=o.fuente;if(o.provider)s.provider=o.provider;if(typeof o.apifyToken==='string')s.apifyToken=o.apifyToken;if(o.apifyActor)s.apifyActor=o.apifyActor;if(typeof o.apiBase==='string')s.apiBase=o.apiBase;if(typeof o.apifyOk==='boolean')s.apifyOk=o.apifyOk;if(typeof o.apifyCheckedAt==='string')s.apifyCheckedAt=o.apifyCheckedAt;if(typeof o.apifyDetail==='string')s.apifyDetail=o.apifyDetail;if(typeof o.aiBase==='string')s.aiBase=o.aiBase;if(typeof o.aiKey==='string')s.aiKey=o.aiKey;if(typeof o.aiModel==='string')s.aiModel=o.aiModel;}catch(e){}}
+function persistSettings(){try{const s=settings();localStorage.setItem('od.settings',JSON.stringify({fuente:s.fuente,provider:s.provider,apifyToken:s.apifyToken,apifyActor:s.apifyActor,apiBase:s.apiBase,apiToken:s.apiToken,apiUser:s.apiUser,apiTokenExp:s.apiTokenExp,apifyOk:s.apifyOk,apifyCheckedAt:s.apifyCheckedAt,apifyDetail:s.apifyDetail,aiBase:s.aiBase,aiKey:s.aiKey,aiModel:s.aiModel}));}catch(e){}}
+function restoreSettings(){try{const raw=localStorage.getItem('od.settings');if(!raw)return;const o=JSON.parse(raw);const s=settings();if(typeof o.fuente==='number'&&o.fuente>=0&&o.fuente<FUENTES.length)s.fuente=o.fuente;if(o.provider)s.provider=o.provider;if(typeof o.apifyToken==='string')s.apifyToken=o.apifyToken;if(o.apifyActor)s.apifyActor=o.apifyActor;if(typeof o.apiBase==='string')s.apiBase=o.apiBase;if(typeof o.apiToken==='string')s.apiToken=o.apiToken;if(o.apiUser&&typeof o.apiUser==='object')s.apiUser=o.apiUser;if(typeof o.apiTokenExp==='string')s.apiTokenExp=o.apiTokenExp;if(typeof o.apifyOk==='boolean')s.apifyOk=o.apifyOk;if(typeof o.apifyCheckedAt==='string')s.apifyCheckedAt=o.apifyCheckedAt;if(typeof o.apifyDetail==='string')s.apifyDetail=o.apifyDetail;if(typeof o.aiBase==='string')s.aiBase=o.aiBase;if(typeof o.aiKey==='string')s.aiKey=o.aiKey;if(typeof o.aiModel==='string')s.aiModel=o.aiModel;}catch(e){}}
 function isComercialId(id){const u=DB.users.find(x=>x.id===id);return !!(u&&u.rol==='comercial');}
 function webLabel(l){return l.web_tipo==='propia'?'Con web propia':(l.web_tipo?('Solo '+l.web_tipo):'Sin web');}
 function dbPayload(){
@@ -1609,11 +1646,12 @@ function apifyFetchItems(p,extCtrl){
     /* Vía backend: el token y el actor viven en el servidor. */
     if(backendConfigured()){
       const base=apiBase();
-      const opt={method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({actor:actor,input:buildApifyInput(actor,p,limit),params:{sector:p.sector,zona:p.zona,max:limit},sinWeb:p.sinWeb!==false})};
+      /* v1.2.0: el servidor decide actor e input; solo se envían los parámetros. */
+      const opt={method:'POST',headers:apiHeaders(),body:JSON.stringify({params:{sector:p.sector,zona:p.zona,max:limit},sinWeb:p.sinWeb!==false})};
       if(ctrl)opt.signal=ctrl.signal;
       fetch(base+'/api/search',opt).then(function(res){
         return res.json().catch(function(){return {};}).then(function(j){
-          if(!res.ok){const e=new Error('HTTP '+res.status+((j&&j.error)?(' · '+j.error):''));e.status=res.status;throw e;}
+          if(!res.ok){apiAuthFailed(res);const e=new Error('HTTP '+res.status+((j&&j.error)?(' · '+j.error):''));e.status=res.status;throw e;}
           return j;
         });
       }).then(function(j){settle(function(){finish(null,j);});})
@@ -1641,9 +1679,32 @@ function isSpainItem(raw){
 }
 function syncLeadsToBackend(leads){
   const base=apiBase();if(!base||!leads||!leads.length)return;
-  fetch(base+'/api/leads',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({leads:leads})})
-    .then(function(res){if(!res.ok)throw new Error('HTTP '+res.status);return res.json();})
-    .then(function(){toast(leads.length+' leads guardados en el backend','ok');})
+  if(!backendLogged()){toast('Leads guardados en local. Inicia sesión en el backend (Configuración) para compartirlos con el equipo.','warn');return;}
+  const byRef={};leads.forEach(function(l){byRef[l.id]=l;});
+  fetch(base+'/api/leads',{method:'POST',headers:apiHeaders(),body:JSON.stringify({leads:leads})})
+    .then(function(res){if(!res.ok){apiAuthFailed(res);throw new Error('HTTP '+res.status);}return res.json();})
+    .then(function(j){
+      /* El servidor es la fuente de verdad: si el negocio ya estaba (otro
+         comercial, otra búsqueda), se adopta su estado y su «no contactar». */
+      let bloqueados=0,yaGestionados=0;
+      (j.leads||[]).forEach(function(r){
+        const l=byRef[r.client_ref];if(!l)return;
+        l.server_id=r.id;
+        if(r.duplicate){
+          if(r.no_contactar&&!l.no_contactar){l.no_contactar=true;bloqueados++;}
+          if(r.estado&&r.estado!=='nuevo'&&l.estado==='nuevo'){l.estado=r.estado;yaGestionados++;}
+          if(r.asignado_a)l.asignado_a=r.asignado_a;
+          l.intentos=Math.max(l.intentos||0,r.intentos||0);
+        }
+      });
+      persistDB();
+      let msg=(j.inserted||0)+' leads nuevos guardados en el backend';
+      if(j.duplicates)msg+=' · '+j.duplicates+' ya existían';
+      if(bloqueados)msg+=' · '+bloqueados+' marcados «no contactar»';
+      if(yaGestionados)msg+=' · '+yaGestionados+' ya gestionados por el equipo';
+      toast(msg,bloqueados?'warn':'ok');
+      if(bloqueados||yaGestionados)render();
+    })
     .catch(function(){toast('Leads guardados en local; el backend no respondió','warn');});
 }
 function importApifyItems(items,p){
@@ -1855,13 +1916,13 @@ function saveApiBase(){
   const el=document.getElementById('apiBase');
   const val=el?String(el.value||'').trim():'';
   const clean=val.replace(/\/+$/,'');
-  const st=settings();st.apiBase=clean;st.apifyOk=false;st.apifyCheckedAt='';st.apifyDetail='';persistSettings();
+  const st=settings();if(st.apiBase!==clean){st.apiToken='';st.apiUser=null;st.apiTokenExp='';}st.apiBase=clean;st.apifyOk=false;st.apifyCheckedAt='';st.apifyDetail='';persistSettings();
   audits('settings','update',null,{apiBase:clean||'(vacío)'});
   toast(clean?('Backend configurado: '+clean+' · usa «Probar conexión»'):'Backend desactivado (se usará el token del navegador)',clean?'ok':'warn');
   render();
 }
 function clearApiBase(){
-  const st=settings();st.apiBase='';st.apifyOk=false;st.apifyCheckedAt='';st.apifyDetail='';persistSettings();
+  const st=settings();st.apiBase='';st.apiToken='';st.apiUser=null;st.apiTokenExp='';st.apifyOk=false;st.apifyCheckedAt='';st.apifyDetail='';persistSettings();
   audits('settings','update',null,{apiBase:'(eliminado)'});
   toast('Backend eliminado','warn');render();
 }
@@ -1911,7 +1972,7 @@ function loadDatasetFile(input){
 function bindDelegates(){
   document.addEventListener('click',function(e){
     if(e.target.closest('[data-select],#selAll'))return;
-    const t=e.target.closest('[data-go],[data-filter],[data-webfilter],[data-bulkassign],[data-tab],[data-estado],[data-call],[data-demo],[data-send],[data-addnote],[data-ticket],[data-edituser],[data-tfilter],[data-newticket],[data-toggle-nocontact],[data-reassign],[data-next],[data-score],[data-newarticle],[data-kbview],[data-source],[data-webhooktest],[data-notif],[data-demoopen],[data-web],[data-copyprompt],[data-del-lead],[data-del-search],[data-undo-search],#exportLeads,#exportClients,#runSearch,#resetSearch,#quickSearch,#importDataset,#newUser,#apifySave,#apifyClear,#apifyTest,#apiSave,#apiClear,#aiSave,#aiClear,#dbExport,#dbImportBtn,#bulkAssign,#bulkStatus,#bulkNoContact,#bulkExport,#bulkDelete,#bulkClear,#selectAllBtn,#undoLastSearch,#clearSearchHistory');
+    const t=e.target.closest('[data-go],[data-filter],[data-webfilter],[data-bulkassign],[data-tab],[data-estado],[data-call],[data-demo],[data-send],[data-addnote],[data-ticket],[data-edituser],[data-tfilter],[data-newticket],[data-toggle-nocontact],[data-reassign],[data-next],[data-score],[data-newarticle],[data-kbview],[data-source],[data-webhooktest],[data-notif],[data-demoopen],[data-web],[data-copyprompt],[data-del-lead],[data-del-search],[data-undo-search],#exportLeads,#exportClients,#runSearch,#resetSearch,#quickSearch,#importDataset,#newUser,#apifySave,#apifyClear,#apifyTest,#apiSave,#apiClear,#apiLogin,#apiLogout,#aiSave,#aiClear,#dbExport,#dbImportBtn,#bulkAssign,#bulkStatus,#bulkNoContact,#bulkExport,#bulkDelete,#bulkClear,#selectAllBtn,#undoLastSearch,#clearSearchHistory');
     if(!t)return;
     if(t.hasAttribute('data-go')){go(t.getAttribute('data-go'));return;}
     if(t.hasAttribute('data-filter')){clearLeadSel();S.filters.lead=t.getAttribute('data-filter');render();return;}
@@ -1947,6 +2008,8 @@ function bindDelegates(){
     if(t.id==='apifyClear'){clearApifySettings();return;}
     if(t.id==='apiSave'){saveApiBase();return;}
     if(t.id==='apiClear'){clearApiBase();return;}
+    if(t.id==='apiLogin'){backendLogin();return;}
+    if(t.id==='apiLogout'){backendLogout();return;}
     if(t.id==='resetSearch'){['fSector','fZona'].forEach(i=>{const el=$('#'+i);if(el)el.value='';});return;}
     if(t.id==='exportLeads'){exportCSV('leads');return;}
     if(t.id==='exportClients'){exportCSV('clientes');return;}
@@ -2297,8 +2360,8 @@ function parseAIJson(txt){
 function generateAICopy(prompt){
   const st=aiSettings();
   if(backendConfigured()){
-    return fetch(apiBase()+'/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt})})
-      .then(function(res){return res.json().catch(function(){return {};}).then(function(j){if(!res.ok)throw new Error(j.error||('HTTP '+res.status));return j.content||j.text||'';});})
+    return fetch(apiBase()+'/api/ai',{method:'POST',headers:apiHeaders(),body:JSON.stringify({prompt:prompt})})
+      .then(function(res){return res.json().catch(function(){return {};}).then(function(j){if(!res.ok){apiAuthFailed(res);}if(!res.ok)throw new Error(j.error||('HTTP '+res.status));return j.content||j.text||'';});})
       .then(parseAIJson);
   }
   if(!st.aiKey||!st.aiBase)return Promise.reject(new Error('Configura la IA en Administración → Configuración o usa un backend.'));
@@ -2316,8 +2379,8 @@ function enrichLead(l){
   const urls=(l.redes||[]).slice(0,3);
   if(!urls.length)return Promise.reject(new Error('Este lead no tiene redes ni web registradas. El prompt ya incluye Google Maps para que la IA investigue.'));
   if(!backendConfigured())return Promise.reject(new Error('Para analizar enlaces automáticamente, configura la URL del backend en Configuración. Si no, copia el prompt en una IA con navegación.'));
-  return fetch(apiBase()+'/api/enrich',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({urls:urls,nombre:l.nombre,ciudad:l.ciudad})})
-    .then(function(res){return res.json().catch(function(){return {};}).then(function(j){if(!res.ok)throw new Error(j.error||('HTTP '+res.status));return j;});});
+  return fetch(apiBase()+'/api/enrich',{method:'POST',headers:apiHeaders(),body:JSON.stringify({urls:urls,nombre:l.nombre,ciudad:l.ciudad})})
+    .then(function(res){return res.json().catch(function(){return {};}).then(function(j){if(!res.ok){apiAuthFailed(res);}if(!res.ok)throw new Error(j.error||('HTTP '+res.status));return j;});});
 }
 function leadSources(l){
   return [

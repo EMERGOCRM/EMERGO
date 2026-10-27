@@ -36,6 +36,19 @@ export const env = {
   // Orígenes permitidos para CORS (separados por coma). "*" permite todos.
   corsOrigin: str('CORS_ORIGIN', '*'),
 
+  // Autenticación. AUTH_SECRET firma las sesiones (mínimo 32 caracteres).
+  // ADMIN_EMAIL / ADMIN_PASSWORD crean el primer administrador si no existe.
+  authSecret: str('AUTH_SECRET', ''),
+  sessionHours: int('SESSION_HOURS', 12),
+  adminEmail: str('ADMIN_EMAIL', ''),
+  adminPassword: str('ADMIN_PASSWORD', ''),
+  adminId: str('ADMIN_ID', 'u1'),
+  adminName: str('ADMIN_NAME', 'Administrador'),
+
+  // Número de proxies delante de la app (Railway = 1). Sirve para que req.ip
+  // sea la IP real y no se pueda falsear con X-Forwarded-For.
+  trustProxy: int('TRUST_PROXY', 1),
+
   isProd: str('NODE_ENV', 'development') === 'production'
 };
 

@@ -63,3 +63,44 @@ CREATE TABLE IF NOT EXISTS settings (
   value      JSONB NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- ---------------------------------------------------------------------------
+-- v1.2.0 · usuarios, interacciones y deduplicación por teléfono.
+-- Todo es idempotente: se puede ejecutar en cada arranque sobre una BD 1.1.x.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS users (
+  id          TEXT PRIMARY KEY,
+  email       TEXT NOT NULL,
+  nombre      TEXT NOT NULL,
+  rol         TEXT NOT NULL CHECK (rol IN ('admin','supervisor','comercial','soporte')),
+  pass_hash   TEXT NOT NULL,
+  activo      BOOLEAN NOT NULL DEFAULT true,
+  created_at  TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS users_email_key ON users (lower(email));
+
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS telefono_norm TEXT;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS client_ref    TEXT;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS created_by    TEXT;
+
+UPDATE leads
+   SET telefono_norm = regexp_replace(regexp_replace(telefono, '\D', '', 'g'), '^(0034|34)([0-9]{9})$', '\2')
+ WHERE telefono_norm IS NULL AND telefono IS NOT NULL AND telefono <> '';
+
+CREATE INDEX IF NOT EXISTS leads_telefono_norm_idx ON leads (telefono_norm) WHERE telefono_norm IS NOT NULL;
+CREATE INDEX IF NOT EXISTS leads_created_idx ON leads (created_at DESC);
+
+CREATE TABLE IF NOT EXISTS lead_interactions (
+  id          TEXT PRIMARY KEY,
+  lead_id     TEXT NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+  user_id     TEXT,
+  tipo        TEXT NOT NULL,
+  resultado   TEXT,
+  nota        TEXT,
+  estado      TEXT,
+  fecha       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS lead_interactions_lead_idx ON lead_interactions (lead_id, fecha DESC);

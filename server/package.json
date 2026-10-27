@@ -1,6 +1,6 @@
 {
   "name": "crm-multimesa-server",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "description": "Backend API para el CRM multi-escritorio: proxy Apify, persistencia de leads, configuración e IA.",
   "license": "UNLICENSED",
@@ -13,7 +13,8 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc -p tsconfig.json && node scripts/copy-assets.js",
     "start": "node dist/index.js",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test test/*.test.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

@@ -6,16 +6,36 @@ Este repositorio contiene el frontend estático (`index.html`) **y** el API
 
 ## Versión
 
-**Versión actual: 1.1.0** (18/10/2026)
+**Versión actual: 1.2.0** (27/10/2026)
 
 - Se muestra en la app (sidebar, login y Configuración) y en `VERSION`.
 - Antes de generar cada ZIP, sube la versión en **los cuatro sitios**:
   `index.html` (`APP_VERSION` y `APP_RELEASE`), `VERSION`, este README y
   `server/package.json`.
-- Nombra el ZIP con la versión, por ejemplo: `crm-captacion-v1.1.0.zip`.
+- Nombra el ZIP con la versión, por ejemplo: `crm-captacion-v1.2.0.zip`.
 
 ### Historial
 
+- **1.2.0** — API de leads multiusuario y segura:
+  - **Login y roles** (admin, supervisor, comercial, soporte). Toda la API
+    salvo `/health`, `/api/auth/login` y `/api/ai/status` exige sesión. El
+    primer admin se crea con `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
+  - **El servidor ya no se cae** con datos erróneos: los errores de las rutas
+    `async` responden 400/409/500 en vez de tumbar el proceso.
+  - **Sin pérdidas entre comerciales:** ids generados en el servidor (UUID);
+    el id del navegador se guarda en `client_ref`. Antes, dos navegadores con
+    el mismo `L1001` se sobrescribían.
+  - **Reimportar respeta la gestión:** si el negocio ya existe (mismo
+    `place_id` o mismo teléfono) solo se refrescan los datos de Maps; estado,
+    asignación, intentos y **«no contactar»** se conservan. El navegador
+    adopta ese estado al sincronizar.
+  - `PATCH` y `DELETE /api/leads/:id`, historial de interacciones, búsqueda
+    por texto y teléfono, control de versiones (409 si otro usuario editó).
+  - `/api/search` solo ejecuta el actor configurado en el servidor; se
+    ignoran el `actor` y el `input` que envíe el navegador.
+  - Fechas solo en ISO 8601, coordenadas `0,0` → vacías, `web_tipo`
+    normalizado, límites de IA por usuario (no falseables por cabecera).
+  - Pruebas de integración (`npm test`) contra PostgreSQL real.
 - **1.1.0** — Estudio web en 3 pasos (fuentes, prompt IA y demo), prompt
   enriquecido con datos verificables y análisis de enlaces públicos, imágenes
   por sector, copia de seguridad/restauración de datos locales, deshacer y
@@ -44,7 +64,11 @@ Este repositorio contiene el frontend estático (`index.html`) **y** el API
 │  │  ├─ schema.sql      # tablas leads / searches / settings
 │  │  ├─ apify.ts        # proxy al actor de Apify (token en servidor)
 │  │  ├─ ai.ts           # IA OpenAI-compatible + análisis de enlaces
-│  │  └─ routes/         # search, leads, config, ai
+│  │  ├─ auth.ts         # contraseñas (scrypt), sesiones firmadas y roles
+│  │  ├─ http.ts         # wrapper async, errores HTTP y rate limit
+│  │  ├─ validate.ts     # normalización y validación de leads
+│  │  └─ routes/         # auth, search, leads, config, ai
+│  ├─ test/              # pruebas de integración (npm test)
 │  ├─ Dockerfile
 │  ├─ .env.example
 │  └─ Procfile
@@ -54,18 +78,51 @@ Este repositorio contiene el frontend estático (`index.html`) **y** el API
 
 ## API
 
-| Método | Ruta               | Descripción                                             |
-| ------ | ------------------ | ------------------------------------------------------- |
-| GET    | `/health`          | Estado del servicio, BD, Apify e IA.                    |
-| POST   | `/api/search`      | Ejecuta el actor de Apify. El token vive en el servidor.|
-| POST   | `/api/leads`       | Inserta/actualiza leads (array o `{ leads: [] }`).      |
-| GET    | `/api/leads`       | Lista leads (`?estado=&asignado_a=&limit=&offset=`).    |
-| GET    | `/api/leads/:id`   | Devuelve un lead.                                       |
-| GET    | `/api/config`      | Config pública (sin secretos).                          |
-| PUT    | `/api/config`      | Actualiza el actor de Apify (tabla `settings`).         |
-| GET    | `/api/ai/status`   | Indica si el servidor tiene IA y qué modelo usa.        |
-| POST   | `/api/ai`          | Genera el copy JSON de la demo a partir del brief.      |
-| POST   | `/api/enrich`      | Descarga hasta 3 enlaces públicos y resume su contenido.|
+Todas las rutas `/api/*` exigen `Authorization: Bearer <token>` salvo las
+marcadas como públicas.
+
+| Método | Ruta                            | Quién            | Descripción |
+| ------ | ------------------------------- | ---------------- | ----------- |
+| GET    | `/health`                       | público          | Estado del servicio, BD, Apify e IA. |
+| POST   | `/api/auth/login`               | público          | `{ email, password }` → `{ token, expires_at, user }`. 10 intentos / 10 min por IP. |
+| GET    | `/api/auth/me`                  | sesión           | Usuario de la sesión. |
+| GET    | `/api/users`                    | admin, supervisor| Lista de usuarios. |
+| POST   | `/api/users`                    | admin            | `{ id?, email, nombre?, rol, password }`. Usa los mismos ids que el frontend (u1, u2…). |
+| PATCH  | `/api/users/:id`                | admin            | `{ nombre?, rol?, activo?, password? }`. Desactivar corta la sesión al momento. |
+| POST   | `/api/search`                   | sesión           | `{ params: { sector, zona, max }, sinWeb?, persist? }`. Actor e input los decide el servidor. |
+| POST   | `/api/leads`                    | sesión           | Importa leads (array o `{ leads }`, máx. 500). Ver «Deduplicación». |
+| GET    | `/api/leads`                    | sesión           | `?estado=&asignado_a=(id\|none)&q=&ciudad=&sector=&no_contactar=&updated_since=&limit=&offset=` → `{ leads, total }`. |
+| GET    | `/api/leads/:id`                | sesión           | Lead completo + interacciones. |
+| PATCH  | `/api/leads/:id`                | sesión           | Estado, asignación, próxima acción, intentos, `no_contactar`… Envía `updated_at` para detectar ediciones simultáneas (409). |
+| DELETE | `/api/leads/:id`                | admin            | Si está en «no contactar» exige `?force=1`. |
+| GET    | `/api/leads/:id/interactions`   | sesión           | Historial del lead. |
+| POST   | `/api/leads/:id/interactions`   | sesión           | `{ tipo, resultado?, nota?, estado? }`. Una `llamada` suma un intento. |
+| GET    | `/api/config`                   | sesión           | Config pública (sin secretos). |
+| PUT    | `/api/config`                   | admin            | Cambia el actor de Apify (formato `usuario/actor`). |
+| GET    | `/api/apify/status`             | sesión           | Valida token y actor sin gastar créditos. |
+| GET    | `/api/ai/status`                | público          | Indica si el servidor tiene IA y qué modelo usa. |
+| POST   | `/api/ai`                       | sesión           | Genera el copy JSON de la demo (30 / 10 min por usuario). |
+| POST   | `/api/enrich`                   | sesión           | Analiza hasta 3 enlaces públicos (20 / 10 min por usuario). |
+
+### Permisos sobre leads
+
+- **admin y supervisor** ven y reasignan todos los leads; solo ellos pueden
+  quitar «no contactar». Solo **admin** borra.
+- **comercial y soporte** ven sus leads y los que no tienen asignar. Los que
+  importan quedan asignados a ellos y solo pueden asignarse leads libres.
+
+### Deduplicación al importar (`POST /api/leads`)
+
+1. **Mismo `place_id`** → es la misma ficha: se refrescan nombre, rating,
+   reseñas, horario, etc. (los campos vacíos no borran lo que había).
+2. **Mismo teléfono** (normalizado, sin `+34`) → se devuelve el lead
+   existente sin mezclar datos.
+3. Si no, se crea con un UUID del servidor.
+
+En los casos 1 y 2 **nunca** se tocan estado, asignación, intentos, próxima
+acción ni `no_contactar`. La respuesta trae `duplicate: true` y el estado
+actual, y el frontend lo adopta (por ejemplo, marca «no contactar» un lead que
+otro comercial ya excluyó).
 
 `POST /api/search` acepta `{ actor?, input?, params?, persist? }`. Si envías
 `params` (`{ sector, zona, max }`), el servidor construye el input del actor.
@@ -162,20 +219,54 @@ configura la URL del API en **Administración → Configuración**).
 2. Sube este repositorio (`railway up`, o conecta el repo de GitHub).
    `railway.json` ya indica el `server/Dockerfile` y el healthcheck `/health`.
 3. En **Variables** del servicio define:
+   - `AUTH_SECRET` — cadena aleatoria de 32+ caracteres (obligatoria).
+   - `ADMIN_EMAIL` y `ADMIN_PASSWORD` — crean el primer admin al arrancar
+     (contraseña de 10+ caracteres). Después puedes quitarlas.
    - `APIFY_TOKEN` — tu token privado (obligatorio para búsquedas reales).
    - `APIFY_DEFAULT_ACTOR` — opcional, por defecto `compass/crawler-google-places`.
    - `CORS_ORIGIN` — tu dominio público, p. ej. `https://tu-app.up.railway.app`.
 4. El mismo servicio sirve el frontend y el API. Abre la URL pública y, en
-   **Administración → Configuración**, pon esa URL en *Backend / API URL*.
+   **Administración → Configuración**, pon esa URL en *Backend / API URL* e
+   **inicia sesión** con tu usuario del servidor.
+5. Crea al resto del equipo con `POST /api/users`, usando los mismos ids que
+   el frontend (`u2`, `u3`…), para que las asignaciones coincidan.
+
+### Actualizar desde la 1.1.x
+
+La migración es automática al arrancar (añade `users`, `lead_interactions` y
+columnas nuevas; no borra datos). Antes de subirla define `AUTH_SECRET`,
+`ADMIN_EMAIL` y `ADMIN_PASSWORD`: sin usuario, la API responde 401 a todo.
+Los leads que ya estén en la BD conservan su id. Si dos navegadores llegaron a
+pisarse en la 1.1.x, esas pérdidas no se pueden recuperar desde el servidor;
+los datos de cada navegador siguen en su copia local.
 
 > El token de Apify **nunca** se guarda en `index.html` ni se envía al navegador:
 > sólo existe en las variables de entorno del servidor.
 
+## Pruebas
+
+```bash
+cd server
+TEST_DATABASE_URL=postgres://crm:crm@localhost:5432/crm_test npm test
+```
+
+Usa una base de datos **solo para pruebas**: borra y recrea las tablas.
+Cubren login y permisos, que el servidor no se cae con datos erróneos, la
+deduplicación, que reimportar no resetea «no contactar», importaciones
+simultáneas, ediciones simultáneas (409) e interacciones. Apify se simula
+con un servidor local, así que no gastan créditos.
+
 ## Notas y trabajo pendiente
 
+- **El frontend aún trabaja en local.** Envía los leads al importar y adopta
+  el estado del servidor, pero los cambios del día a día (llamadas, estados)
+  siguen guardándose en el navegador. El siguiente paso es que lea y escriba
+  en `GET/PATCH /api/leads` y use `localStorage` solo como caché.
+
 - **PostGIS** queda pospuesto (fase 2); por ahora se usan columnas `lat`/`lng`.
-- **Autenticación JWT** y **telefonía** aún no están implementadas (adaptadores
-  preparados en el frontend).
+- **Telefonía** aún no está implementada (adaptadores preparados en el
+  frontend). El login del frontend sigue siendo de demostración; el del
+  backend es el que protege los datos.
 - La búsqueda es síncrona (`run-sync-get-dataset-items`). Para volúmenes
   grandes, en fase 2 se moverá a un modo asíncrono con colas (Redis + BullMQ).
 - Sin `APIFY_TOKEN` ni URL de backend no se generan leads de prueba: la

@@ -1,39 +1,30 @@
 import { Router, Request, Response } from 'express';
 import { aiChat, aiConfigured, researchBrief, researchPages } from '../ai';
 import { env } from '../env';
+import { makeRateLimiter } from '../http';
 
 const router = Router();
 
-const hits = new Map<string, { count: number; reset: number }>();
-const WINDOW_MS = 10 * 60 * 1000;
+const aiLimit = makeRateLimiter(10 * 60 * 1000);
 
-function clientIp(req: Request): string {
-  const fwd = req.headers['x-forwarded-for'];
-  if (typeof fwd === 'string' && fwd.trim()) return fwd.split(',')[0].trim();
-  return req.ip || req.socket.remoteAddress || 'unknown';
-}
-
+/** Límite por usuario autenticado (ya no por IP, que se podía falsear). */
 function rateLimit(req: Request, res: Response, max: number): boolean {
-  const now = Date.now();
-  const key = clientIp(req);
-  const cur = hits.get(key);
-  if (!cur || cur.reset <= now) {
-    hits.set(key, { count: 1, reset: now + WINDOW_MS });
-    return true;
-  }
-  if (cur.count >= max) {
+  const key = `u:${req.user?.id || req.ip}`;
+  if (!aiLimit(key, max)) {
     res.status(429).json({ error: 'Demasiadas peticiones de IA. Espera unos minutos.' });
     return false;
   }
-  cur.count += 1;
   return true;
 }
+
+/** Ruta pública: solo indica si hay IA, sin exponer nada sensible. */
+export const publicAi = Router();
 
 /**
  * GET /api/ai/status
  * Indica si el servidor tiene IA configurada y qué modelo usa. Nunca expone la clave.
  */
-router.get('/ai/status', (_req: Request, res: Response) => {
+publicAi.get('/ai/status', (_req: Request, res: Response) => {
   res.json({ ok: true, configured: aiConfigured(), model: aiConfigured() ? env.openaiModel : null });
 });
 
