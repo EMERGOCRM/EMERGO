@@ -104,3 +104,49 @@ CREATE TABLE IF NOT EXISTS lead_interactions (
 );
 
 CREATE INDEX IF NOT EXISTS lead_interactions_lead_idx ON lead_interactions (lead_id, fecha DESC);
+
+-- ---------------------------------------------------------------------------
+-- v1.3.0 · fotos, sincronización, exclusiones permanentes, búsquedas y demos.
+-- ---------------------------------------------------------------------------
+
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS image_url TEXT;
+
+ALTER TABLE lead_interactions ADD COLUMN IF NOT EXISTS client_ref TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS lead_interactions_client_ref_key
+  ON lead_interactions (lead_id, client_ref) WHERE client_ref IS NOT NULL;
+
+-- Negocios que pidieron no ser contactados. Sobreviven al borrado del lead:
+-- si vuelven a salir en una búsqueda, no se importan.
+CREATE TABLE IF NOT EXISTS exclusions (
+  id             TEXT PRIMARY KEY,
+  place_id       TEXT,
+  telefono_norm  TEXT,
+  nombre         TEXT,
+  motivo         TEXT,
+  created_by     TEXT,
+  created_at     TIMESTAMPTZ DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS exclusions_place_key ON exclusions (place_id) WHERE place_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS exclusions_tel_idx ON exclusions (telefono_norm) WHERE telefono_norm IS NOT NULL;
+
+ALTER TABLE searches ADD COLUMN IF NOT EXISTS proveedor TEXT;
+ALTER TABLE searches ADD COLUMN IF NOT EXISTS params JSONB;
+ALTER TABLE searches ADD COLUMN IF NOT EXISTS stats JSONB;
+ALTER TABLE searches ADD COLUMN IF NOT EXISTS lead_ids JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE searches ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
+CREATE INDEX IF NOT EXISTS leads_search_idx ON leads (search_id);
+
+CREATE TABLE IF NOT EXISTS demos (
+  id          TEXT PRIMARY KEY,
+  slug        TEXT NOT NULL UNIQUE,
+  lead_id     TEXT REFERENCES leads(id) ON DELETE CASCADE,
+  tipo        TEXT NOT NULL CHECK (tipo IN ('web','crm')),
+  html        TEXT NOT NULL,
+  prompt      TEXT,
+  modelo      TEXT,
+  visitas     INTEGER NOT NULL DEFAULT 0,
+  ultima_visita TIMESTAMPTZ,
+  created_by  TEXT,
+  created_at  TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS demos_lead_idx ON demos (lead_id, created_at DESC);

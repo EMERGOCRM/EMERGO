@@ -1,7 +1,7 @@
 import path from 'path';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import { env, hasAI } from './env';
+import { env, hasAI, hasGoogle, activeProvider, hasDemoAI } from './env';
 import { migrate, dbEnabled, dbHealthy, closePool } from './db';
 import searchRoutes from './routes/search';
 import leadRoutes from './routes/leads';
@@ -10,6 +10,9 @@ import aiRoutes, { publicAi } from './routes/ai';
 import { publicAuth, privateAuth, requireAuth } from './routes/auth';
 import { bootstrapAdmin } from './auth';
 import { HttpError, pgErrorToHttp } from './http';
+import searchesRoutes from './routes/searches';
+import { mediaRouter } from './places';
+import { demosApi, demosPublic } from './demos';
 
 const app = express();
 
@@ -30,13 +33,20 @@ app.get('/health', async (_req: Request, res: Response) => {
     time: new Date().toISOString(),
     db: { configured: dbEnabled(), up: db },
     apify: { configured: !!env.apifyToken.trim() },
-    ai: { configured: hasAI(), model: hasAI() ? env.openaiModel : null }
+    ai: { configured: hasAI(), model: hasAI() ? env.openaiModel : null },
+    google: { configured: hasGoogle() },
+    provider: activeProvider(),
+    demos: { configured: hasDemoAI() }
   });
 });
 
 app.get('/api/health', (_req: Request, res: Response) => {
   res.redirect(307, '/health');
 });
+
+// --- Rutas públicas sin sesión: fotos firmadas y demos para el cliente ------
+app.use(mediaRouter);
+app.use(demosPublic);
 
 // --- API -----------------------------------------------------------------
 // Públicas: login y estado de la IA. Todo lo demás exige sesión.
@@ -45,6 +55,8 @@ app.use('/api', publicAi);
 app.use('/api', requireAuth);
 app.use('/api', privateAuth);
 app.use('/api', searchRoutes);
+app.use('/api', searchesRoutes);
+app.use('/api', demosApi);
 app.use('/api', leadRoutes);
 app.use('/api', configRoutes);
 app.use('/api', aiRoutes);

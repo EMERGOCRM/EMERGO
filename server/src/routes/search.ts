@@ -5,6 +5,8 @@ import { runActor, ApifyError } from '../apify';
 import { ah, HttpError, makeRateLimiter } from '../http';
 import { optInt, optStr } from '../validate';
 import { configuredActor } from './config';
+import { googleSearch } from '../places';
+import { activeProvider, hasApifyToken, hasGoogle } from '../env';
 
 const router = Router();
 
@@ -13,7 +15,10 @@ const searchLimit = makeRateLimiter(10 * 60 * 1000);
 
 /**
  * POST /api/search
- * Body: { params: { sector, zona, max }, sinWeb?, persist? }
+ * Body: { params: { sector, zona, max }, sinWeb?, persist?, provider? }
+ *
+ * provider: 'google' (Places API, rápido) o 'apify'. Si no se indica, se usa
+ * el configurado en el servidor (SEARCH_PROVIDER).
  *
  * El actor y el input los decide SIEMPRE el servidor: se ignoran `actor` e
  * `input` del cliente para que nadie pueda ejecutar otros actores con tu token.
@@ -32,10 +37,17 @@ router.post(
       zona: optStr(p.zona, 120) || undefined,
       max: optInt(p.max, 1, 120) ?? 60
     };
-    const actor = await configuredActor();
+    const wanted = optStr(body.provider, 20);
+    const provider = wanted === 'google' || wanted === 'apify' ? wanted : activeProvider();
+    if (provider === 'google' && !hasGoogle()) throw new HttpError(503, 'Google Places no está configurado (GOOGLE_MAPS_API_KEY)');
+    if (provider === 'apify' && !hasApifyToken()) throw new HttpError(503, 'Apify no está configurado (APIFY_TOKEN)');
 
     try {
-      const items = await runActor({ actor, params, sinWeb: body.sinWeb !== false });
+      const started = Date.now();
+      const items =
+        provider === 'google'
+          ? await googleSearch(params)
+          : await runActor({ actor: await configuredActor(), params, sinWeb: body.sinWeb !== false });
 
       if (body.persist) {
         await query(
@@ -44,7 +56,7 @@ router.post(
           [`s_${crypto.randomUUID()}`, user.id, params.sector || null, params.zona || null, items.length]
         );
       }
-      res.json({ items });
+      res.json({ items, provider, ms: Date.now() - started });
     } catch (e) {
       const err = e as ApifyError;
       if (err.name === 'ApifyError') {

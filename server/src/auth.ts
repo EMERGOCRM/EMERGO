@@ -64,6 +64,16 @@ function sign(data: string): string {
   return crypto.createHmac('sha256', secret).update(data).digest('base64url');
 }
 
+/** Firma corta para URLs públicas (fotos): evita que usen el proxy con tu clave. */
+export function signValue(value: string): string {
+  return sign(`v:${value}`).slice(0, 22);
+}
+
+export function checkSignedValue(value: string, sig: string): boolean {
+  const exp = signValue(value);
+  return sig.length === exp.length && crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(exp));
+}
+
 export function issueToken(user: AuthUser): { token: string; expires_at: string } {
   const exp = Date.now() + Math.max(1, env.sessionHours) * 3600 * 1000;
   const payload = b64url(JSON.stringify({ sub: user.id, exp }));

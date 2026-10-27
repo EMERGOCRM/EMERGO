@@ -45,6 +45,25 @@ export const env = {
   adminId: str('ADMIN_ID', 'u1'),
   adminName: str('ADMIN_NAME', 'Administrador'),
 
+  // Motor de búsqueda: 'google' (Places API New), 'apify' o 'auto' (google si
+  // hay clave, si no apify).
+  searchProvider: str('SEARCH_PROVIDER', 'auto'),
+  googleMapsKey: str('GOOGLE_MAPS_API_KEY', ''),
+  googleApi: str('GOOGLE_PLACES_API', 'https://places.googleapis.com/v1'),
+  googleTimeoutMs: int('GOOGLE_TIMEOUT_MS', 20000),
+
+  // Generación de demos. Si hay ANTHROPIC_API_KEY se usa Claude; si no, el
+  // endpoint compatible con OpenAI de arriba (con DEMO_MODEL si se define).
+  anthropicApiKey: str('ANTHROPIC_API_KEY', ''),
+  anthropicApi: str('ANTHROPIC_API', 'https://api.anthropic.com/v1'),
+  demoModel: str('DEMO_MODEL', ''),
+  demoTimeoutMs: int('DEMO_TIMEOUT_MS', 240000),
+  demoBrand: str('DEMO_BRAND', 'Emergo'),
+
+  // URL pública de la app (para enlaces de demo y fotos). Si falta, se deduce
+  // de la petición.
+  publicUrl: str('PUBLIC_URL', ''),
+
   // Número de proxies delante de la app (Railway = 1). Sirve para que req.ip
   // sea la IP real y no se pueda falsear con X-Forwarded-For.
   trustProxy: int('TRUST_PROXY', 1),
@@ -54,6 +73,20 @@ export const env = {
 
 export function hasApifyToken(): boolean {
   return !!env.apifyToken.trim();
+}
+
+export function hasGoogle(): boolean {
+  return !!env.googleMapsKey.trim();
+}
+
+export function activeProvider(): 'google' | 'apify' {
+  const p = env.searchProvider.toLowerCase();
+  if (p === 'google' || p === 'apify') return p;
+  return hasGoogle() ? 'google' : 'apify';
+}
+
+export function hasDemoAI(): boolean {
+  return !!env.anthropicApiKey.trim() || !!env.openaiApiKey.trim();
 }
 
 export function hasAI(): boolean {

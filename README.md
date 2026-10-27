@@ -6,16 +6,46 @@ Este repositorio contiene el frontend estático (`index.html`) **y** el API
 
 ## Versión
 
-**Versión actual: 1.2.0** (27/10/2026)
+**Versión actual: 1.3.1** (27/10/2026)
 
 - Se muestra en la app (sidebar, login y Configuración) y en `VERSION`.
 - Antes de generar cada ZIP, sube la versión en **los cuatro sitios**:
   `index.html` (`APP_VERSION` y `APP_RELEASE`), `VERSION`, este README y
   `server/package.json`.
-- Nombra el ZIP con la versión, por ejemplo: `crm-captacion-v1.2.0.zip`.
+- Nombra el ZIP con la versión, por ejemplo: `crm-captacion-v1.3.1.zip`.
 
 ### Historial
 
+- **1.3.1** — Deshacer búsquedas para todo el equipo:
+  - «Deshacer» en **cada** búsqueda del historial (no solo la última). Se
+    hace en el servidor: borra los leads que trajo y que nadie ha trabajado y
+    conserva los que tienen estado, llamadas, notas, demo o «no contactar».
+    Los negocios que ya existían antes de la búsqueda no se tocan.
+  - Quitar una búsqueda del historial (o vaciarlo) también se aplica en el
+    servidor; los leads se conservan.
+  - `POST /api/searches/:id/undo` y `DELETE /api/searches/:id` (dueño o admin).
+- **1.3.0** — El servidor es la fuente de verdad, búsquedas rápidas y demos reales:
+  - **Sincronización completa.** Leads, cambios de estado, llamadas, notas,
+    asignaciones y búsquedas se suben al servidor y lo que hace el resto del
+    equipo se baja cada 30 s. Al iniciar sesión, los leads que ya había en el
+    navegador (búsquedas anteriores) **se suben solos**. `localStorage` queda
+    como caché sin conexión.
+  - **Todas las búsquedas se guardan** en el servidor (quién, qué, dónde,
+    proveedor, resultados y leads que trajo).
+  - **Google Places API** como motor (1–2 s por búsqueda, con reseñas, horario y
+    fotos). Apify sigue disponible. La cobertura por provincias va en paralelo.
+  - **Fotos reales** del negocio (proxy firmado, la clave de Google no sale
+    del servidor). Sin foto, una portada por sector. Se eliminan las imágenes
+    de stock que no tenían nada que ver (candados, medusa, máquina de escribir…).
+  - **Demos de verdad.** La web la genera una IA (Claude u OpenAI) con la
+    ficha, las reseñas reales, las fotos y las redes; se publica en
+    `/demo/<slug>` aislada con CSP sandbox, cuenta visitas y se envía por
+    WhatsApp. La demo de CRM es una plantilla personalizada. Botón «Abrir en
+    Lovable» con el mismo prompt y las fotos para construir la web definitiva.
+  - **Lista de exclusión permanente:** borrar un lead «no contactar» lo
+    excluye de futuras importaciones.
+  - Se quita el falso «Lista Robinson: OK» de la ficha (el CRM no la consulta)
+    y el horario inventado «Lun–Vie 9:00–20:00» de los leads sin horario.
 - **1.2.0** — API de leads multiusuario y segura:
   - **Login y roles** (admin, supervisor, comercial, soporte). Toda la API
     salvo `/health`, `/api/auth/login` y `/api/ai/status` exige sesión. El
@@ -67,7 +97,9 @@ Este repositorio contiene el frontend estático (`index.html`) **y** el API
 │  │  ├─ auth.ts         # contraseñas (scrypt), sesiones firmadas y roles
 │  │  ├─ http.ts         # wrapper async, errores HTTP y rate limit
 │  │  ├─ validate.ts     # normalización y validación de leads
-│  │  └─ routes/         # auth, search, leads, config, ai
+│  │  ├─ places.ts       # Google Places API (New) + proxy de fotos firmado
+│  │  ├─ demos.ts        # demos web (IA) y CRM, publicación en /demo/:slug
+│  │  └─ routes/         # auth, search, searches, leads, config, ai
 │  ├─ test/              # pruebas de integración (npm test)
 │  ├─ Dockerfile
 │  ├─ .env.example
@@ -100,6 +132,20 @@ marcadas como públicas.
 | GET    | `/api/config`                   | sesión           | Config pública (sin secretos). |
 | PUT    | `/api/config`                   | admin            | Cambia el actor de Apify (formato `usuario/actor`). |
 | GET    | `/api/apify/status`             | sesión           | Valida token y actor sin gastar créditos. |
+| POST   | `/api/leads/batch`              | sesión           | `{ updates: [{ id, ...campos, log? }], deletes: [id] }`. Resultado por elemento. Borrar: admin. |
+| GET    | `/api/leads/ids`                | sesión           | Ids visibles (detecta borrados y reasignaciones). |
+| POST   | `/api/interactions/batch`       | sesión           | Sube historial del navegador. Idempotente por `client_ref`. |
+| GET    | `/api/exclusions`               | admin, supervisor| Lista de exclusión (negocios que pidieron no ser contactados). |
+| DELETE | `/api/exclusions/:id`           | admin            | Quita un negocio de la lista de exclusión. |
+| POST   | `/api/searches`                 | sesión           | Guarda búsquedas (upsert por id). |
+| GET    | `/api/searches`                 | sesión           | Historial (admin/supervisor: todas; resto: las suyas). |
+| POST   | `/api/searches/:id/undo`        | dueño o admin    | Deshace la búsqueda: borra sus leads sin trabajar → `{ deleted, kept }`. |
+| DELETE | `/api/searches/:id`             | dueño o admin    | Quita la búsqueda del historial; los leads se conservan. |
+| POST   | `/api/demos`                    | sesión           | `{ lead_id, tipo: 'web'\|'crm', notas? }` → publica `/demo/<slug>`. Web: 40/hora por usuario. |
+| POST   | `/api/demos/prompt`             | sesión           | Vista previa del prompt, fuentes y enlace de Lovable. |
+| GET    | `/api/demos?lead_id=`           | sesión           | Demos del lead con visitas. |
+| GET    | `/demo/:slug`                   | público          | La demo para el cliente (CSP sandbox, noindex). |
+| GET    | `/media/place-photo/...jpg`     | público (firmado)| Fotos de Google sin exponer la clave. |
 | GET    | `/api/ai/status`                | público          | Indica si el servidor tiene IA y qué modelo usa. |
 | POST   | `/api/ai`                       | sesión           | Genera el copy JSON de la demo (30 / 10 min por usuario). |
 | POST   | `/api/enrich`                   | sesión           | Analiza hasta 3 enlaces públicos (20 / 10 min por usuario). |
@@ -126,6 +172,48 @@ otro comercial ya excluyó).
 
 `POST /api/search` acepta `{ actor?, input?, params?, persist? }`. Si envías
 `params` (`{ sector, zona, max }`), el servidor construye el input del actor.
+
+## Motor de búsqueda: Google Places o Apify
+
+| | Google Places API (New) | Apify `crawler-google-places` |
+|---|---|---|
+| Velocidad | 1–2 s por página de 20 (máx. 60 por consulta) | minutos por zona |
+| Datos | teléfono, web, nota, horario, **5 reseñas y fotos** | según extras contratados |
+| Coste aprox. | ~40 $ / 1.000 peticiones (20 negocios cada una); 1.000 peticiones gratis al mes | desde ~1,50 $ / 1.000 negocios + extras |
+| Filtro «sin web» | en el CRM (se pagan también los que tienen web) | en el actor |
+
+Configura `GOOGLE_MAPS_API_KEY` y `SEARCH_PROVIDER=auto`. En el buscador cada
+comercial puede elegir el motor. Precios orientativos: revisa los vigentes en
+Google Cloud y Apify. Ten en cuenta que los términos de Google limitan cuánto
+tiempo se guardan sus datos; el `place_id` se puede guardar indefinidamente.
+
+### Crear la clave de Google
+
+1. <https://console.cloud.google.com> → crea un proyecto y activa la facturación.
+2. APIs y servicios → Biblioteca → **Places API (New)** → Habilitar.
+3. Credenciales → Crear credenciales → Clave de API. Restríngela a «Places API (New)».
+4. Pon un presupuesto con alertas (Facturación → Presupuestos) para no llevarte sustos.
+5. En Railway → Variables: `GOOGLE_MAPS_API_KEY=<clave>`.
+
+## Demos para el cliente
+
+En la ficha del lead → **Generar demo**:
+
+- **Web con IA:** el servidor reúne la ficha de Google, las reseñas reales
+  (con nombre corto), las fotos reales, el horario, las redes y el texto de
+  sus enlaces públicos, construye el prompt y lo envía a la IA. La web se
+  publica en `/demo/<slug>`, cuenta visitas y se envía por WhatsApp.
+  Configura `ANTHROPIC_API_KEY` (recomendado) u `OPENAI_API_KEY` con un modelo
+  potente (`DEMO_MODEL`). No uses modelos «mini»: la calidad cae mucho.
+- **Demo de CRM:** plantilla profesional con el nombre, el sector y los
+  servicios del negocio. Sin IA: instantánea y gratis.
+- **Abrir en Lovable:** abre Lovable con el mismo prompt y las fotos como
+  referencia para construir el proyecto definitivo cuando el cliente cierre.
+  Lovable no permite lanzarlo solo: hay que pulsar enviar allí (gasta créditos
+  de tu cuenta).
+
+Las demos se sirven con `Content-Security-Policy: sandbox`: el HTML generado
+corre en un origen aislado y no puede leer la sesión del CRM.
 
 ## Inteligencia artificial
 
@@ -222,7 +310,10 @@ configura la URL del API en **Administración → Configuración**).
    - `AUTH_SECRET` — cadena aleatoria de 32+ caracteres (obligatoria).
    - `ADMIN_EMAIL` y `ADMIN_PASSWORD` — crean el primer admin al arrancar
      (contraseña de 10+ caracteres). Después puedes quitarlas.
-   - `APIFY_TOKEN` — tu token privado (obligatorio para búsquedas reales).
+   - `GOOGLE_MAPS_API_KEY` — motor de búsqueda rápido con reseñas y fotos (ver abajo).
+   - `ANTHROPIC_API_KEY` (u `OPENAI_API_KEY` + `DEMO_MODEL`) — demos web con IA.
+   - `PUBLIC_URL` — la URL pública de la app, para los enlaces de demo.
+   - `APIFY_TOKEN` — opcional desde la 1.3.0 (motor alternativo).
    - `APIFY_DEFAULT_ACTOR` — opcional, por defecto `compass/crawler-google-places`.
    - `CORS_ORIGIN` — tu dominio público, p. ej. `https://tu-app.up.railway.app`.
 4. El mismo servicio sirve el frontend y el API. Abre la URL pública y, en
@@ -258,10 +349,9 @@ con un servidor local, así que no gastan créditos.
 
 ## Notas y trabajo pendiente
 
-- **El frontend aún trabaja en local.** Envía los leads al importar y adopta
-  el estado del servidor, pero los cambios del día a día (llamadas, estados)
-  siguen guardándose en el navegador. El siguiente paso es que lea y escriba
-  en `GET/PATCH /api/leads` y use `localStorage` solo como caché.
+- **Sincronización:** si dos personas cambian el mismo lead a la vez, gana el
+  último cambio que llega al servidor (los dos quedan en el historial).
+- **Lista Robinson:** no está integrada. Consultadla antes de cada campaña.
 
 - **PostGIS** queda pospuesto (fase 2); por ahora se usan columnas `lat`/`lng`.
 - **Telefonía** aún no está implementada (adaptadores preparados en el

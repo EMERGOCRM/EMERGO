@@ -15,14 +15,63 @@ if (!DB_URL) {
   return;
 }
 
-// Apify falso: registra qué actor e input recibe el servidor.
+// Servicios externos falsos: Apify, Google Places y la IA de las demos.
 const apifyCalls = [];
+const googleCalls = [];
+const aiCalls = [];
+const GOOGLE_PLACES = [
+  {
+    id: 'G_ROSA',
+    displayName: { text: 'Peluquería Rosa' },
+    formattedAddress: 'Calle Larios 5, 29005 Málaga, España',
+    addressComponents: [
+      { longText: 'Málaga', shortText: 'Málaga', types: ['locality'] },
+      { longText: 'España', shortText: 'ES', types: ['country'] }
+    ],
+    location: { latitude: 36.72, longitude: -4.42 },
+    primaryTypeDisplayName: { text: 'Peluquería' },
+    nationalPhoneNumber: '952 11 22 33',
+    rating: 4.8,
+    userRatingCount: 57,
+    regularOpeningHours: { weekdayDescriptions: ['lunes: 9:30–20:00'] },
+    googleMapsUri: 'https://maps.google.com/?cid=1',
+    businessStatus: 'OPERATIONAL',
+    photos: [{ name: 'places/G_ROSA/photos/F1' }],
+    reviews: [{ rating: 5, originalText: { text: 'Rosa me dejó el pelo perfecto, trato encantador y muy puntual.' }, authorAttribution: { displayName: 'Marta López' } }]
+  },
+  {
+    id: 'G_CON_WEB',
+    displayName: { text: 'Salón Con Web' },
+    websiteUri: 'https://salon.es',
+    businessStatus: 'OPERATIONAL',
+    addressComponents: [{ shortText: 'ES', types: ['country'] }]
+  },
+  { id: 'G_CERRADO', displayName: { text: 'Cerrado' }, businessStatus: 'CLOSED_PERMANENTLY' }
+];
 const fakeApify = http.createServer((req, res) => {
   let body = '';
   req.on('data', (c) => (body += c));
   req.on('end', () => {
-    apifyCalls.push({ url: req.url, body: body ? JSON.parse(body) : null });
+    const json = body ? JSON.parse(body) : null;
     res.setHeader('Content-Type', 'application/json');
+    if (req.url.startsWith('/gv1/places:searchText')) {
+      googleCalls.push({ headers: req.headers, body: json });
+      res.end(JSON.stringify({ places: GOOGLE_PLACES }));
+      return;
+    }
+    if (req.url.startsWith('/gv1/places/G_ROSA/photos/F1/media')) {
+      googleCalls.push({ photo: req.url });
+      res.setHeader('Content-Type', 'image/jpeg');
+      res.end(Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
+      return;
+    }
+    if (req.url.startsWith('/anthropic/messages')) {
+      aiCalls.push({ headers: req.headers, body: json });
+      const html = '```html\n<!DOCTYPE html><html><head><meta charset="utf-8"></head><body><h1>Peluquería Rosa</h1><script>document.title="x"</script></body></html>\n```';
+      res.end(JSON.stringify({ content: [{ type: 'text', text: html }] }));
+      return;
+    }
+    apifyCalls.push({ url: req.url, body: json });
     res.end('[]');
   });
 });
@@ -67,11 +116,16 @@ before(async () => {
     AUTH_SECRET: 'x'.repeat(40),
     APIFY_TOKEN: 'apify_api_falso',
     APIFY_API: `http://127.0.0.1:${fakeApify.address().port}/v2`,
+    GOOGLE_MAPS_API_KEY: 'g-key-falsa',
+    GOOGLE_PLACES_API: `http://127.0.0.1:${fakeApify.address().port}/gv1`,
+    ANTHROPIC_API_KEY: 'sk-ant-falsa',
+    ANTHROPIC_API: `http://127.0.0.1:${fakeApify.address().port}/anthropic`,
+    DEMO_BRAND: 'Emergo',
     NODE_ENV: 'test'
   });
   db = require('../dist/db');
   await db.query(
-    'DROP TABLE IF EXISTS lead_interactions, leads, searches, settings, users CASCADE'
+    'DROP TABLE IF EXISTS demos, exclusions, lead_interactions, leads, searches, settings, users CASCADE'
   );
   await db.migrate();
   await require('../dist/auth').bootstrapAdmin();
@@ -178,6 +232,7 @@ test('/api/search ignora el actor y el input que manda el navegador', async () =
   const r = await call('POST', '/api/search', {
     token: tokens.lucia,
     body: {
+      provider: 'apify',
       actor: 'malo/minero-cripto',
       input: { startUrls: ['http://evil'] },
       params: { sector: 'Peluquería', zona: 'Málaga', max: 10 }
@@ -329,11 +384,20 @@ test('registrar una llamada suma un intento y cambia el estado', async () => {
   assert.equal(bad.status, 400);
 });
 
-test('borrar: solo admin, y «no contactar» exige confirmación', async () => {
+test('borrar un lead «no contactar» lo pasa a la lista de exclusión', async () => {
   const [luis] = await db.query("SELECT id FROM leads WHERE place_id = 'P_LUIS'");
   assert.equal((await call('DELETE', `/api/leads/${luis.id}`, { token: tokens.javier })).status, 403);
-  assert.equal((await call('DELETE', `/api/leads/${luis.id}`, { token: tokens.admin })).status, 409);
-  assert.equal((await call('DELETE', `/api/leads/${luis.id}?force=1`, { token: tokens.admin })).status, 200);
+  assert.equal((await call('DELETE', `/api/leads/${luis.id}`, { token: tokens.admin })).status, 200);
+  const ex = await call('GET', '/api/exclusions', { token: tokens.admin });
+  assert.ok(ex.json.exclusions.some((e) => e.place_id === 'P_LUIS'));
+  // Vuelve a salir en una búsqueda: no se importa.
+  const r = await call('POST', '/api/leads', {
+    token: tokens.lucia,
+    body: [{ id: 'L77', place_id: 'P_LUIS', nombre: 'Taller Luis', telefono: '600333444' }]
+  });
+  assert.equal(r.json.saved, 0);
+  assert.equal(r.json.excluded.length, 1);
+  assert.equal(r.json.excluded[0].client_ref, 'L77');
 });
 
 test('búsqueda por nombre y por teléfono', async () => {
@@ -341,4 +405,197 @@ test('búsqueda por nombre y por teléfono', async () => {
   assert.ok(r.json.leads.some((l) => l.nombre === 'Bar Pepe'));
   const t = await call('GET', '/api/leads?q=600%2011%2012', { token: tokens.admin });
   assert.ok(t.json.leads.some((l) => l.nombre === 'Bar Pepe'));
+});
+
+// --- v1.3.0 ------------------------------------------------------------------
+
+test('lote: cambios y borrados con permisos por elemento', async () => {
+  const mk = await call('POST', '/api/leads', {
+    token: tokens.lucia,
+    body: [{ id: 'B1', place_id: 'P_B1', nombre: 'Lote 1' }, { id: 'B2', place_id: 'P_B2', nombre: 'Lote 2' }]
+  });
+  const [b1, b2] = mk.json.leads.map((l) => l.id);
+  const [pepe] = await db.query("SELECT id FROM leads WHERE place_id = 'P_PEPE'");
+  const r = await call('POST', '/api/leads/batch', {
+    token: tokens.javier,
+    body: {
+      updates: [
+        { id: b1, estado: 'callback', log: false },  // de Lucía: Javier no lo ve
+        { id: pepe.id, estado: 'nuevo' }
+      ],
+      deletes: [b2]
+    }
+  });
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.json.results.map((x) => x.status || 200), [404, 404, 403]);
+
+  const ok = await call('POST', '/api/leads/batch', {
+    token: tokens.lucia,
+    body: { updates: [{ id: b1, estado: 'callback', intentos: 2, log: false }, { id: b2, estado: 'nada' }] }
+  });
+  assert.equal(ok.json.results[0].ok, true);
+  assert.equal(ok.json.results[0].lead.estado, 'callback');
+  assert.equal(ok.json.results[1].ok, false); // estado inválido no bloquea al resto
+  const its = await call('GET', `/api/leads/${b1}/interactions`, { token: tokens.lucia });
+  assert.equal(its.json.interactions.filter((i) => i.tipo === 'estado').length, 0); // log:false
+
+  const del = await call('POST', '/api/leads/batch', { token: tokens.admin, body: { deletes: [b2, 'no-existe'] } });
+  assert.ok(del.json.results.every((x) => x.ok));
+});
+
+test('interacciones del navegador: subida idempotente', async () => {
+  const [pepe] = await db.query("SELECT id FROM leads WHERE place_id = 'P_PEPE'");
+  const items = [
+    { lead_id: pepe.id, client_ref: 'i-aaa', tipo: 'llamada', resultado: 'no contesta', nota: 'Primera llamada', fecha: '2026-10-20T10:00:00Z' },
+    { lead_id: pepe.id, client_ref: 'i-bbb', tipo: 'raro', nota: 'tipo desconocido pasa a nota' }
+  ];
+  const a = await call('POST', '/api/interactions/batch', { token: tokens.lucia, body: { items } });
+  const b = await call('POST', '/api/interactions/batch', { token: tokens.lucia, body: { items } });
+  assert.equal(a.json.saved, 2);
+  assert.equal(b.json.saved, 2);
+  const n = await db.query("SELECT count(*)::int AS n FROM lead_interactions WHERE client_ref IN ('i-aaa','i-bbb')");
+  assert.equal(n[0].n, 2);
+  const x = await call('POST', '/api/interactions/batch', { token: tokens.javier, body: { items: [{ ...items[0], client_ref: 'i-ccc' }] } });
+  assert.equal(x.json.failed.length, 1); // no es su lead
+});
+
+test('lectura incremental con interacciones e ids visibles', async () => {
+  const since = new Date(Date.now() - 60000).toISOString();
+  const r = await call('GET', `/api/leads?updated_since=${encodeURIComponent(since)}&with_interactions=1&limit=500`, { token: tokens.lucia });
+  assert.equal(r.status, 200);
+  assert.ok(r.json.server_time);
+  const pepe = r.json.leads.find((l) => l.place_id === 'P_PEPE');
+  assert.ok(pepe);
+  assert.ok(r.json.interactions[pepe.id].some((i) => i.client_ref === 'i-aaa'));
+  const ids = await call('GET', '/api/leads/ids', { token: tokens.javier });
+  assert.ok(!ids.json.ids.includes(pepe.id));
+});
+
+test('búsquedas: se guardan y nadie pisa las de otro', async () => {
+  const s = { id: 's-test1', sector: 'Peluquería', zona: 'Málaga', resultados: 12, nuevos: 9, duplicados: 3, proveedor: 'google', lead_ids: ['x'], fecha: '2026-10-27T09:00:00Z' };
+  assert.deepEqual((await call('POST', '/api/searches', { token: tokens.lucia, body: { searches: [s] } })).json.saved, ['s-test1']);
+  const pisar = await call('POST', '/api/searches', { token: tokens.javier, body: { searches: [{ ...s, nuevos: 0 }] } });
+  assert.deepEqual(pisar.json.saved, []);
+  const mine = await call('GET', '/api/searches', { token: tokens.lucia });
+  assert.equal(mine.json.searches.find((x) => x.id === 's-test1').nuevos, 9);
+  const other = await call('GET', '/api/searches', { token: tokens.javier });
+  assert.ok(!other.json.searches.some((x) => x.id === 's-test1'));
+  const all = await call('GET', '/api/searches', { token: tokens.admin });
+  assert.ok(all.json.searches.some((x) => x.id === 's-test1'));
+});
+
+let rosaItem;
+test('Google Places: busca, mapea como Apify y descarta cerrados', async () => {
+  googleCalls.length = 0;
+  const r = await call('POST', '/api/search', { token: tokens.lucia, body: { params: { sector: 'Peluquería', zona: 'Málaga', max: 20 } } });
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  assert.equal(r.json.provider, 'google');
+  assert.equal(googleCalls[0].body.textQuery, 'Peluquería en Málaga');
+  assert.equal(googleCalls[0].headers['x-goog-api-key'], 'g-key-falsa');
+  assert.match(googleCalls[0].headers['x-goog-fieldmask'], /places\.reviews/);
+  assert.equal(r.json.items.length, 2);
+  rosaItem = r.json.items[0];
+  assert.equal(rosaItem.title, 'Peluquería Rosa');
+  assert.equal(rosaItem.placeId, 'G_ROSA');
+  assert.equal(rosaItem.city, 'Málaga');
+  assert.equal(rosaItem.countryCode, 'ES');
+  assert.equal(rosaItem.reviews[0].name, 'Marta López');
+  assert.match(rosaItem.imageUrl, /^\/media\/place-photo\/.+\.jpg$/);
+  assert.equal(r.json.items[1].website, 'https://salon.es');
+});
+
+test('fotos: el proxy firmado sirve la imagen y rechaza firmas falsas', async () => {
+  const ok = await fetch(base + rosaItem.imageUrl);
+  assert.equal(ok.status, 200);
+  assert.equal(ok.headers.get('content-type'), 'image/jpeg');
+  assert.match(ok.headers.get('cache-control'), /max-age/);
+  const bad = await fetch(base + rosaItem.imageUrl.replace(/place-photo\/[^/]+/, 'place-photo/firmafalsafirmafalsa12'));
+  assert.equal(bad.status, 403);
+});
+
+let rosaId;
+test('demo web: usa reseñas y fotos reales, se publica aislada y cuenta visitas', async () => {
+  const imp = await call('POST', '/api/leads', {
+    token: tokens.lucia,
+    body: [{ id: 'L500', place_id: 'G_ROSA', nombre: 'Peluquería Rosa', sector: 'Peluquería', ciudad: 'Málaga', telefono: '952 11 22 33', rating: 4.8, resenas: 57, image_url: rosaItem.imageUrl, raw: rosaItem }]
+  });
+  rosaId = imp.json.leads[0].id;
+  assert.equal(imp.json.leads[0].image_url, rosaItem.imageUrl);
+
+  aiCalls.length = 0;
+  const r = await call('POST', '/api/demos', { token: tokens.lucia, body: { lead_id: rosaId, tipo: 'web', notas: 'Destacar el trato' } });
+  assert.equal(r.status, 201, JSON.stringify(r.json));
+  const prompt = aiCalls[0].body.messages[0].content;
+  assert.match(prompt, /Rosa me dejó el pelo perfecto/);
+  assert.match(prompt, /Marta L\./);
+  assert.doesNotMatch(prompt, /Marta López/);
+  assert.match(prompt, /\/media\/place-photo\//);
+  assert.match(prompt, /Destacar el trato/);
+  assert.equal(aiCalls[0].headers['x-api-key'], 'sk-ant-falsa');
+  assert.match(r.json.lovable_url, /^https:\/\/lovable\.dev\/#prompt=/);
+  assert.match(r.json.lovable_url, /images=/);
+
+  const page = await fetch(r.json.demo.url.replace(/^https?:\/\/[^/]+/, base), { headers: { 'User-Agent': 'Mozilla/5.0' } });
+  assert.equal(page.status, 200);
+  assert.match(page.headers.get('content-security-policy'), /^sandbox/);
+  const html = await page.text();
+  assert.match(html, /^<!DOCTYPE html>/);
+  assert.match(html, /noindex/);
+  await new Promise((r2) => setTimeout(r2, 100));
+  const list = await call('GET', `/api/demos?lead_id=${rosaId}`, { token: tokens.lucia });
+  assert.equal(list.json.demos[0].visitas, 1);
+  assert.equal((await call('GET', `/api/demos?lead_id=${rosaId}`, { token: tokens.javier })).status, 404);
+});
+
+test('demo CRM: plantilla personalizada sin IA', async () => {
+  aiCalls.length = 0;
+  const r = await call('POST', '/api/demos', { token: tokens.lucia, body: { lead_id: rosaId, tipo: 'crm' } });
+  assert.equal(r.status, 201);
+  assert.equal(aiCalls.length, 0);
+  const html = await (await fetch(r.json.demo.url.replace(/^https?:\/\/[^/]+/, base))).text();
+  assert.match(html, /Peluquería Rosa/);
+  assert.match(html, /Corte/);
+  assert.match(html, /4\.8 ★/);
+});
+
+test('prompt de demo sin generar (vista previa)', async () => {
+  const r = await call('POST', '/api/demos/prompt', { token: tokens.lucia, body: { lead_id: rosaId } });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.fuentes.reseñas, 1);
+  assert.equal(r.json.fuentes.fotos, 1);
+});
+
+// --- v1.3.1: deshacer búsquedas ------------------------------------------------
+
+test('deshacer búsqueda: borra lo no trabajado, conserva lo trabajado', async () => {
+  await call('POST', '/api/searches', { token: tokens.lucia, body: { searches: [{ id: 's-mala', sector: 'Basura', zona: 'Málaga', resultados: 3, nuevos: 3 }] } });
+  const imp = await call('POST', '/api/leads', {
+    token: tokens.lucia,
+    body: [
+      { id: 'U1', place_id: 'P_U1', nombre: 'Basura 1', search_id: 's-mala' },
+      { id: 'U2', place_id: 'P_U2', nombre: 'Basura 2', search_id: 's-mala' },
+      { id: 'U3', place_id: 'P_U3', nombre: 'Basura 3', search_id: 's-mala' },
+      { id: 'U4', place_id: 'P_PEPE', nombre: 'Bar Pepe', search_id: 's-mala' } // ya existía: no es de esta búsqueda
+    ]
+  });
+  const [u1, u2, u3] = imp.json.leads.map((l) => l.id);
+  // U2 ya se ha llamado; U3 tiene una nota.
+  await call('PATCH', `/api/leads/${u2}`, { token: tokens.lucia, body: { estado: 'no_contesta', intentos: 1 } });
+  await call('POST', `/api/leads/${u3}/interactions`, { token: tokens.lucia, body: { tipo: 'nota', nota: 'ojo, interesante' } });
+
+  assert.equal((await call('POST', '/api/searches/s-mala/undo', { token: tokens.javier })).status, 403);
+  const r = await call('POST', '/api/searches/s-mala/undo', { token: tokens.lucia });
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  assert.deepEqual(r.json.deleted, [u1]);
+  assert.deepEqual(r.json.kept.map((k) => k.id).sort(), [u2, u3].sort());
+  const left = await db.query("SELECT id, search_id FROM leads WHERE place_id IN ('P_U1','P_U2','P_U3','P_PEPE')");
+  assert.equal(left.length, 3);
+  assert.ok(left.every((l) => l.search_id !== 's-mala'));
+  assert.equal((await db.query("SELECT 1 FROM searches WHERE id = 's-mala'")).length, 0);
+});
+
+test('borrar del historial: el dueño puede, otro comercial no', async () => {
+  await call('POST', '/api/searches', { token: tokens.lucia, body: { searches: [{ id: 's-hist' }] } });
+  assert.equal((await call('DELETE', '/api/searches/s-hist', { token: tokens.javier })).status, 403);
+  assert.equal((await call('DELETE', '/api/searches/s-hist', { token: tokens.lucia })).status, 200);
 });

@@ -356,7 +356,7 @@ button{font-family:inherit;font-size:inherit;cursor:pointer}
 
 /* Versión visible de la app. Subir en CADA cambio y mantener sincronizados:
    APP_VERSION (aquí), VERSION, README.md y server/package.json. */
-const APP_VERSION='1.2.0';
+const APP_VERSION='1.3.1';
 const APP_RELEASE='27/10/2026';
 
 /* ---------- iconos (familia única, trazo 1.8) ---------- */
@@ -479,7 +479,7 @@ function sectorMeta(sector){
   const hit=SECTOR_IMAGE_RULES.find(function(r){return r.re.test(k);});
   return hit||{img:'assets/generic.jpg',plantilla:'Local'};
 }
-function leadImage(l){return sectorMeta(l&&l.sector).img;}
+/* leadImage(): ver bloque FOTOS (v1.3.0) */
 function sectorServices(sector){
   if(SECTOR_SERVICIOS[sector])return SECTOR_SERVICIOS[sector];
   const k=sectorKey(sector);
@@ -528,13 +528,13 @@ function mkLead(o){
     lat:o.lat,lng:o.lng,telefono:o.telefono,email:o.email||'',
     web_detectada:!!o.web, web_tipo:o.web||null,
     redes:o.redes||[],rating:o.rating,resenas:o.resenas,
-    horario:o.horario||'Lun–Vie 9:00–20:00',
+    horario:o.horario||'',
     maps:'https://maps.google.com/?q='+encodeURIComponent(o.nombre+' '+o.ciudad),
     descripcion_ia:o.desc,score:o.score,estado:o.estado,motivo_descarte:o.motivo||null,
     asignado_a:o.asignado||null,search_id:o.search||null,
     proxima_accion:o.proxima||null,proxima_tipo:o.proximaTipo||null,
     intentos:o.intentos||0,no_contactar:!!o.noContactar,
-    fuente:o.fuente||'Google Places',fotos:[meta.img],created_at:o.created||todayShift(-6,10),
+    fuente:o.fuente||'Google Places',fotos:[],image_url:o.foto||null,created_at:o.created||todayShift(-6,10),
     interactions:[],demos:[],calls:[]
   };
   return l;
@@ -673,6 +673,7 @@ function mountLogin(){
   $$('[data-login]').forEach(b=>b.addEventListener('click',()=>{
     const u=DB.users.find(x=>x.id===b.getAttribute('data-login'));
     S.user=u;S.aiMsgs=[];
+    if(typeof syncReady==='function'&&backendConfigured()&&backendLogged()){startSyncLoop();setTimeout(syncNow,300);}
     const land=u.rol==='admin'?'#/admin':u.rol==='soporte'?'#/clients':'#/leads/dashboard';
     go(land);render();
     toast('Bienvenido/a, '+u.nombre.split(' ')[0],'ok');
@@ -924,6 +925,7 @@ function viewSearch(){
         field('Cobertura','<select class="select" id="fCobertura"><option value="auto">Automática (zona vacía = todas las provincias)</option><option value="zona">Solo la zona indicada</option><option value="provincias">Toda España por provincias (52 celdas)</option></select>')+
       '</div>'+
       '<p class="small muted mt8" style="margin-bottom:0">'+icon('info','sm')+' Cobertura por provincias: una consulta por cada una de las 52 provincias, repartiendo el máximo total. Es pausable y cancelable, pero consume créditos de Apify y puede tardar. Empieza con una ciudad y 10 resultados.</p>'+
+      field('Motor de búsqueda','<select class="select" id="fMotor"><option value="auto">Automático (el del servidor)</option><option value="google">Google Places · rápido, con reseñas y fotos</option><option value="apify">Apify · barridos grandes</option></select>','Google responde en segundos; Apify tarda minutos por zona.')+
       field('Filtro de contacto','<select class="select" id="fContacto"><option value="cualquiera">Cualquiera</option><option value="tel">Solo con teléfono</option><option value="tel-email">Teléfono + email</option></select>')+
       '<div class="notice" style="border-color:var(--accent)">'+icon('filter','sm')+'<span class="small">Regla fija: se piden a Google Maps <b>solo negocios sin web propia</b> (<span class="mono">website: withoutWebsite</span>), en <b>España</b>. Se aceptan los que solo tienen redes sociales y se descartan los que ya tienen web.</span></div>'+
       '<label class="chk"><input type="checkbox" id="fProgramar"> Programar como búsqueda recurrente mensual</label>'+
@@ -951,7 +953,7 @@ function viewSearch(){
   '</div></div>'+
   '<div class="card mt16"><div class="card-head"><h3>Historial de búsquedas</h3><span class="fill"></span><span class="badge">'+hist.length+'</span></div><div class="tbl-wrap"><table class="table"><thead><tr><th>Palabras clave</th><th>Zona</th><th>Lanzada por</th><th>Fecha</th><th>Resultados</th><th>Nuevos</th><th>Duplicados</th><th>Estado</th><th></th></tr></thead><tbody>'+
     (hist.length?hist.map(s=>'<tr><td class="strong">'+esc(s.sector)+'</td><td class="small">'+esc(s.zona||'Toda España')+'</td><td class="small">'+esc(userById(s.user_id).nombre)+'</td><td class="small">'+fmtDate(s.fecha)+'</td><td class="mono tiny">'+s.resultados+'</td><td class="mono tiny" style="color:var(--ok)">+'+s.nuevos+'</td><td class="mono tiny muted">'+s.duplicados+'</td><td>'+(s.programada?'<span class="badge" style="background:var(--accent-tint);color:var(--accent)">'+s.programada+'</span> ':'')+searchStatusBadge(s)+'</td><td class="right nowrap">'+
-      (s.id===latestId?'<button class="iconbtn" data-undo-search="'+s.id+'" title="Deshacer esta búsqueda">'+icon('refresh','sm')+'</button>':'')+
+      '<button class="btn ghost sm" data-undo-search="'+s.id+'" title="Borra los leads que trajo esta búsqueda y no se han trabajado">'+icon('refresh','sm')+' Deshacer</button>'+
       '<button class="iconbtn" data-del-search="'+s.id+'" title="Eliminar del historial (conserva leads)" style="color:var(--danger)">'+icon('trash','sm')+'</button></td></tr>').join(''):'<tr><td colspan="9"><div class="empty" style="padding:22px"><p class="small">Aún no hay búsquedas. Lanza la primera y quedará guardada aquí.</p></div></td></tr>')+
   '</tbody></table></div></div>';
 }
@@ -1004,7 +1006,7 @@ function viewLeadDetail(id){
       '<button class="btn outline" data-estado="'+l.id+'">'+icon('refresh','sm')+' Cambiar estado</button>'+
       (isAdmin()?'<button class="btn ghost" data-del-lead="'+l.id+'" style="color:var(--danger)">'+icon('trash','sm')+' Eliminar lead</button>':'')+
     '</div></div>'+
-  '<div class="lead-hero card mb16"><div class="media"><img src="'+esc(leadImage(l))+'" alt="'+esc(l.sector)+'"><span class="src badge" style="background:rgba(15,23,42,.72);color:#fff">'+esc(l.fuente)+'</span></div>'+
+  '<div class="lead-hero card mb16"><div class="media"><img src="'+esc(leadImage(l))+'" alt="'+esc(l.sector)+'" data-sector="'+esc(l.sector)+'" onerror="this.onerror=null;this.src=sectorCover(this.getAttribute(\'data-sector\'))"><span class="src badge" style="background:rgba(15,23,42,.72);color:#fff">'+esc(l.fuente)+'</span></div>'+
     '<div class="card-body"><div class="row gap16 wrap"><span class="fill" style="min-width:260px"><span class="tiny muted">Descripción generada por IA</span><p style="margin:6px 0 0;font-size:15px">'+esc(l.descripcion_ia)+'</p></span>'+
     '<span class="ring" style="--p:'+l.score+'" data-v="'+l.score+'"></span></div>'+
     '<div class="row gap24 wrap mt16 tiny muted"><span>'+icon('star','sm')+' '+l.rating+' ★ · '+l.resenas+' reseñas</span><span>'+icon('pin','sm')+' '+esc(l.direccion)+', '+esc(l.ciudad)+'</span><span>'+icon('phone','sm')+' '+esc(l.telefono)+'</span></div></div></div>'+
@@ -1026,7 +1028,7 @@ function tabFicha(l){
         '<dt>Sector</dt><dd>'+esc(l.sector)+'</dd>'+
         '<dt>Dirección</dt><dd>'+esc(l.direccion)+', '+esc(l.ciudad)+'</dd>'+
         '<dt>Coordenadas</dt><dd class="mono tiny">'+l.lat.toFixed(4)+', '+l.lng.toFixed(4)+'</dd>'+
-        '<dt>Teléfono</dt><dd class="mono">'+esc(l.telefono)+' <span class="tag line tiny" style="margin-left:6px">'+icon('shield','sm')+' Lista Robinson: OK</span></dd>'+
+        '<dt>Teléfono</dt><dd class="mono">'+esc(l.telefono)+' <span class="tag line tiny" style="margin-left:6px;color:var(--warn)" title="El CRM no consulta la Lista Robinson: hazlo antes de cada campaña en listarobinson.es">'+icon('shield','sm')+' Lista Robinson: sin comprobar</span></dd>'+
         '<dt>Email</dt><dd>'+(l.email?esc(l.email):'<span class="muted">No disponible</span>')+'</dd>'+
         '<dt>Horario</dt><dd>'+esc(l.horario)+'</dd>'+
         '<dt>Redes</dt><dd>'+(l.redes.length?l.redes.map(r=>'<span class="tag">'+icon(socialIcon(r),'sm')+' '+r+'</span>').join(' '):'<span class="muted">Ninguna</span>')+'</dd>'+
@@ -1061,12 +1063,12 @@ function tabDemos(l){
   const demo=l.demos.slice().sort((a,b)=>new Date(b.caduca_en)-new Date(a.caduca_en));
   return '<div class="cols-2"><div class="card"><div class="card-head"><h3>Demos generadas</h3><span class="fill"></span><button class="btn primary sm" data-demo="'+l.id+'"'+(l.no_contactar?' disabled':'')+'>'+icon('sparkles','sm')+' Generar demo</button></div><div class="card-body">'+
     (demo.length?demo.map(d=>'<div class="demo-card mb8"><span class="avatar" style="background:var(--accent-tint);color:var(--accent)">'+icon(d.tipo==='web'?'globe':'kanban','sm')+'</span><span class="fill"><span class="strong">Demo '+(d.tipo==='web'?'Web':'mini-CRM')+'</span><br><span class="tiny muted mono od-truncate" style="max-width:100%">'+esc(d.url)+'</span></span><span class="stack center tiny"><span class="badge" style="background:var(--ok-tint);color:var(--ok)">'+esc(d.estado)+'</span><span class="muted">'+d.visitas+' visitas</span><span class="muted">caduca '+fmtDate(d.caduca_en)+'</span></span>'+
-'<span class="row gap8"><button class="btn ghost sm" data-web="'+l.id+'" data-webtab="'+(d.tipo==='crm'?'crm':'web')+'">'+icon(d.tipo==='crm'?'kanban':'globe','sm')+' Ver '+(d.tipo==='crm'?'CRM':'web')+'</button><button class="btn outline sm" data-demoopen="'+l.id+'" title="Registra una visita simulada a la demo">'+icon('play','sm')+' Simular apertura</button></span></div>').join(''):'<div class="empty" style="padding:30px"><p class="small">Todavía no se ha generado ninguna demo.</p></div>')+
+'<span class="row gap8"><button class="btn ghost sm" data-web="'+l.id+'" data-webtab="'+(d.tipo==='crm'?'crm':'web')+'">'+icon(d.tipo==='crm'?'kanban':'globe','sm')+' Ver '+(d.tipo==='crm'?'CRM':'web')+'</button><a class="btn outline sm" href="'+esc(d.url)+'" target="_blank" rel="noopener">'+icon('external','sm')+' Abrir</a></span></div>').join(''):'<div class="empty" style="padding:30px"><p class="small">Todavía no se ha generado ninguna demo.</p></div>')+
   '</div></div>'+
   '<div class="card"><div class="card-head"><h3>Contacto</h3></div><div class="card-body">'+
     (l.no_contactar?'<div class="callout danger mb16">'+icon('alert','sm')+'<span>Este lead está marcado como <b>No contactar</b>. Todas las acciones de contacto están bloqueadas.</span></div>':'')+
     '<div class="field"><label for="sendCh">Canal de envío</label><select class="select" id="sendCh"><option value="email">Email</option><option value="whatsapp">WhatsApp</option></select></div>'+
-    '<div class="field"><label for="sendMsg">Plantilla de mensaje</label><textarea class="textarea" id="sendMsg">Hola '+esc(l.nombre)+': hemos preparado una web de demostración con la información pública de tu negocio. Puedes verla aquí: (enlace de demo). Sin compromiso.</textarea></div>'+
+    '<div class="field"><label for="sendMsg">Plantilla de mensaje</label><textarea class="textarea" id="sendMsg">Hola '+esc(l.nombre)+': hemos preparado una web de demostración con la información pública de tu negocio. Puedes verla aquí: '+esc(demo.length?demo[0].url:'(enlace de demo)')+'. Sin compromiso.</textarea></div>'+
     '<div class="row gap8"><button class="btn primary fill" data-send="'+l.id+'"'+(l.no_contactar||!demo.length?' disabled':'')+'>'+icon('arrowright','sm')+' Enviar demo</button></div>'+
     (l.no_contactar||!demo.length?'<p class="tiny muted mt8" style="margin-bottom:0">'+(l.no_contactar?'Contacto bloqueado.':'Genera una demo para poder enviarla.')+'</p>':'')+
     '<div class="hr" style="margin:16px 0"></div>'+
@@ -1270,7 +1272,7 @@ function viewAdminSettings(){
         field('Backend / API URL','<input class="input" id="apiBase" placeholder="https://tu-app.up.railway.app" value="'+esc(st.apiBase||'')+'">','Si la rellenas, las búsquedas y los leads pasan por el backend (recomendado en producción). Déjala vacía para usar el token del navegador.')+
         '<div class="row gap8 mt8"><button class="btn primary" id="apiSave">'+icon('check','sm')+' Guardar backend</button><button class="btn ghost" id="apiClear">Quitar backend</button></div>'+
         (backendConfigured()?(backendLogged()?
-          ('<div class="notice mt16" style="border-color:var(--ok)">'+icon('check','sm')+'<span class="small">Sesión del backend: <b>'+esc((st.apiUser&&st.apiUser.nombre)||'')+'</b> ('+esc((st.apiUser&&st.apiUser.rol)||'')+')'+(st.apiTokenExp?(' · caduca '+esc(fmtDateTime(st.apiTokenExp))):'')+'</span></div><div class="row gap8 mt8"><button class="btn ghost" id="apiLogout">Cerrar sesión del backend</button></div>'):
+          ('<div class="notice mt16" style="border-color:var(--ok)">'+icon('check','sm')+'<span class="small">Sesión del backend: <b>'+esc((st.apiUser&&st.apiUser.nombre)||'')+'</b> ('+esc((st.apiUser&&st.apiUser.rol)||'')+')'+(st.apiTokenExp?(' · caduca '+esc(fmtDateTime(st.apiTokenExp))):'')+'</span></div><div class="notice mt8">'+icon('refresh','sm')+'<span class="small"><b>Sincronización</b>: '+esc(SYNC.status==='error'?('sin conexión ('+SYNC.error+')'):(SYNC.lastOk?('al día · '+fmtDateTime(SYNC.lastOk)):'pendiente'))+' · '+DB.leads.filter(function(x){return x.server_id;}).length+'/'+DB.leads.length+' leads en el servidor</span></div><div class="row gap8 mt8"><button class="btn outline" id="syncNow">'+icon('refresh','sm')+' Sincronizar ahora</button><button class="btn ghost" id="apiLogout">Cerrar sesión del backend</button></div>'):
           ('<div class="notice mt16">'+icon('shield','sm')+'<span class="small">El backend exige sesión. Usa tu usuario del servidor (el primer admin se crea con <span class="mono">ADMIN_EMAIL</span> y <span class="mono">ADMIN_PASSWORD</span>).</span></div>'+
            field('Email','<input class="input" id="apiEmail" type="email" autocomplete="username" value="'+esc((S.user&&S.user.email)||'')+'">')+
            field('Contraseña','<input class="input" id="apiPass" type="password" autocomplete="current-password">')+
@@ -1283,7 +1285,7 @@ function viewAdminSettings(){
         '<div class="notice mt16">'+icon('info','sm')+'<span class="small">Modo manual activo desde el día 1: botón «Registrar llamada» en cada ficha, con resultado y duración.</span></div>')+
     '</div>'+
     '<div class="stack gap16">'+
-      card2('Cumplimiento legal (España)', 'shield', ['Términos de Google Maps: caché temporal (~30 días) y refresh por adaptador.','RGPD / LOPDGDD: base de interés legítimo, canal de oposición.','Llamadas comerciales: comprobación de Lista Robinson.','Emails LSSI: enlace de baja y base legal registrada.','Auditoría de accesos y exportaciones.'].map(t=>'<div class="row gap8 small" style="padding:7px 0">'+icon('check','sm')+'<span class="fill" style="color:var(--ink-2)">'+t+'</span></div>').join(''))+
+      card2('Cumplimiento legal (España)', 'shield', ['Términos de Google Maps: caché temporal (~30 días) y refresh por adaptador.','RGPD / LOPDGDD: base de interés legítimo, canal de oposición.','Llamadas comerciales: consultar la Lista Robinson antes de cada campaña (no está integrada en el CRM).','Emails LSSI: enlace de baja y base legal registrada.','Auditoría de accesos y exportaciones.'].map(t=>'<div class="row gap8 small" style="padding:7px 0">'+icon('check','sm')+'<span class="fill" style="color:var(--ink-2)">'+t+'</span></div>').join(''))+
       card2('Copia de seguridad de tus datos', 'download', '<p class="small muted" style="margin-top:0">Tus leads y búsquedas se guardan en este navegador. Descarga una copia antes de limpiar caché, cambiar de equipo o actualizar el CRM.</p>'+
         '<div class="notice mb16" style="border-color:var(--ok)">'+icon('shield','sm')+'<span class="small"><b>'+DB.leads.length+' leads</b> y <b>'+DB.searches.length+' búsquedas</b> guardados localmente'+(DB.__savedAt?(' · '+esc(fmtDateTime(DB.__savedAt))):'')+'.</span></div>'+
         '<div class="row gap8 wrap"><button class="btn primary" id="dbExport">'+icon('download','sm')+' Descargar copia</button><button class="btn outline" id="dbImportBtn">'+icon('upload','sm')+' Restaurar copia</button><input type="file" id="dbFile" accept="application/json,.json" style="display:none"></div>'+
@@ -1343,7 +1345,7 @@ function backendLogin(){
     if(!r.res.ok||!j.token){toast('No se pudo iniciar sesión: '+(j.error||('HTTP '+r.res.status)),'err');return;}
     const s=settings();s.apiToken=j.token;s.apiTokenExp=j.expires_at||'';s.apiUser=j.user||null;persistSettings();
     audits('settings','update',null,{backend:'sesión iniciada '+email});
-    toast('Sesión iniciada en el backend como '+((j.user&&j.user.nombre)||email),'ok');render();
+    toast('Sesión iniciada en el backend como '+((j.user&&j.user.nombre)||email),'ok');render();startSyncLoop();syncNow();
   }).catch(function(e){toast('No se pudo contactar con el backend: '+(e&&e.name==='AbortError'?'tiempo de espera agotado':(e&&e.message)),'err');});
 }
 function backendLogout(){
@@ -1355,6 +1357,11 @@ function apifyActorPath(actor){const a=String(actor||APIFY_DEFAULT_ACTOR).trim()
 function apifyStateMeta(){
   const st=settings();
   if(!apifyConfigured()&&!backendConfigured())return {label:'Sin fuente',bg:'var(--warn-tint)',fg:'var(--warn)'};
+  if(backendConfigured()&&typeof SYNC!=='undefined'&&SYNC.server){
+    const c=SYNC.server;const prov=c.provider==='google'?'Google Places':'Apify';
+    const ok=c.provider==='google'?(c.google&&c.google.configured):(c.apify&&c.apify.configured);
+    return ok?{label:prov+' (servidor)',bg:'var(--ok-tint)',fg:'var(--ok)'}:{label:prov+' sin clave',bg:'var(--danger-tint)',fg:'var(--danger)'};
+  }
   if(st.apifyOk)return {label:'Conectado',bg:'var(--ok-tint)',fg:'var(--ok)'};
   if(st.apifyCheckedAt)return {label:'Error de conexión',bg:'var(--danger-tint)',fg:'var(--danger)'};
   return {label:'Sin verificar',bg:'var(--warn-tint)',fg:'var(--warn)'};
@@ -1475,13 +1482,15 @@ function dbPayload(){
 function updateSaveState(ok){
   const el=document.getElementById('saveState');if(!el)return;
   const t=DB.__savedAt?('Guardado local · '+fmtDateTime(DB.__savedAt)):'Guardado local';
-  el.textContent=(ok===false?'No se pudo guardar · ':'')+t;
+  el.textContent=(ok===false?'No se pudo guardar · ':'')+t+(typeof syncStatusText==='function'?syncStatusText():'');
   el.style.color=ok===false?'var(--danger)':'#6B7688';
 }
 function persistDB(){
   try{
     const raw=JSON.stringify(dbPayload());
     localStorage.setItem('od.db',raw);
+    const body=raw.slice(raw.indexOf(',"leads"'));
+    if(body!==SYNC.lastRaw){const first=SYNC.lastRaw===null;SYNC.lastRaw=body;if(!first&&!SYNC.inSync&&typeof scheduleSync==='function')scheduleSync();}
     DB.__savedAt=new Date().toISOString();
     DB.__restoreError=false;
     updateSaveState(true);
@@ -1591,7 +1600,9 @@ function mapApifyItem(it,p){
     score:leadScoreFrom(rating,resenas,web,email),
     estado:'nuevo',
     desc:'Negocio de '+String(sector).toLowerCase()+' en '+(ciudad||'la zona')+' detectado en Google Maps'+(hasOwnWeb(web)?'':' (sin web propia)')+'.',
-    fuente:'Apify · Google Maps',
+    fuente:it.source==='google_places'?'Google Places':'Apify · Google Maps',
+    foto:it.imageUrl||(Array.isArray(it.imageUrls)&&it.imageUrls[0])||(Array.isArray(it.images)&&it.images[0]&&(it.images[0].imageUrl||it.images[0]))||'',
+    horario:Array.isArray(it.openingHours)?it.openingHours.map(function(h){return typeof h==='string'?h:((h&&h.day?h.day+': ':'')+((h&&h.hours)||''));}).filter(Boolean).join(' · '):'',
     created:new Date().toISOString(),
     place_id:it.placeId||it.fid||it.cid||stablePlaceId(nombre,direccion,ciudad),
     maps:it.url||it.googleMapsUrl||('https://maps.google.com/?q='+encodeURIComponent(nombre+' '+(ciudad||p.zona)))
@@ -1641,13 +1652,13 @@ function apifyFetchItems(p,extCtrl){
         out.body=e&&e.body;
         return reject(out);
       }
-      resolve(Array.isArray(data)?data:(data&&data.items)||[]);
+      const arr=Array.isArray(data)?data:(data&&data.items)||[];if(data&&data.provider)arr.provider=data.provider;resolve(arr);
     }
     /* Vía backend: el token y el actor viven en el servidor. */
     if(backendConfigured()){
       const base=apiBase();
       /* v1.2.0: el servidor decide actor e input; solo se envían los parámetros. */
-      const opt={method:'POST',headers:apiHeaders(),body:JSON.stringify({params:{sector:p.sector,zona:p.zona,max:limit},sinWeb:p.sinWeb!==false})};
+      const opt={method:'POST',headers:apiHeaders(),body:JSON.stringify({params:{sector:p.sector,zona:p.zona,max:limit},sinWeb:p.sinWeb!==false,provider:(p.motor&&p.motor!=='auto')?p.motor:undefined})};
       if(ctrl)opt.signal=ctrl.signal;
       fetch(base+'/api/search',opt).then(function(res){
         return res.json().catch(function(){return {};}).then(function(j){
@@ -1678,34 +1689,10 @@ function isSpainItem(raw){
   return true;
 }
 function syncLeadsToBackend(leads){
-  const base=apiBase();if(!base||!leads||!leads.length)return;
+  /* v1.3.0: la sincronización sube todo (leads, cambios, historial y búsquedas). */
+  if(!apiBase()||!leads||!leads.length)return;
   if(!backendLogged()){toast('Leads guardados en local. Inicia sesión en el backend (Configuración) para compartirlos con el equipo.','warn');return;}
-  const byRef={};leads.forEach(function(l){byRef[l.id]=l;});
-  fetch(base+'/api/leads',{method:'POST',headers:apiHeaders(),body:JSON.stringify({leads:leads})})
-    .then(function(res){if(!res.ok){apiAuthFailed(res);throw new Error('HTTP '+res.status);}return res.json();})
-    .then(function(j){
-      /* El servidor es la fuente de verdad: si el negocio ya estaba (otro
-         comercial, otra búsqueda), se adopta su estado y su «no contactar». */
-      let bloqueados=0,yaGestionados=0;
-      (j.leads||[]).forEach(function(r){
-        const l=byRef[r.client_ref];if(!l)return;
-        l.server_id=r.id;
-        if(r.duplicate){
-          if(r.no_contactar&&!l.no_contactar){l.no_contactar=true;bloqueados++;}
-          if(r.estado&&r.estado!=='nuevo'&&l.estado==='nuevo'){l.estado=r.estado;yaGestionados++;}
-          if(r.asignado_a)l.asignado_a=r.asignado_a;
-          l.intentos=Math.max(l.intentos||0,r.intentos||0);
-        }
-      });
-      persistDB();
-      let msg=(j.inserted||0)+' leads nuevos guardados en el backend';
-      if(j.duplicates)msg+=' · '+j.duplicates+' ya existían';
-      if(bloqueados)msg+=' · '+bloqueados+' marcados «no contactar»';
-      if(yaGestionados)msg+=' · '+yaGestionados+' ya gestionados por el equipo';
-      toast(msg,bloqueados?'warn':'ok');
-      if(bloqueados||yaGestionados)render();
-    })
-    .catch(function(){toast('Leads guardados en local; el backend no respondió','warn');});
+  scheduleSync();
 }
 function importApifyItems(items,p){
   const existingId={};const existingPhone={};
@@ -1727,6 +1714,8 @@ function importApifyItems(items,p){
     m.asignado=owner;
     const l=mkLead(m);
     l.place_id=m.place_id;l.fuente=m.fuente;l.maps=m.maps;
+    /* Datos completos (reseñas, fotos, horario) para el servidor y las demos; no se guardan en el navegador. */
+    PENDING_RAW[l.id]=raw;
     l.interactions.push({id:uid('i'),user_id:'system',tipo:'estado',resultado:null,nota:'Lead importado desde '+l.fuente+' ('+l.place_id+').',fecha:new Date().toISOString()});
     DB.leads.push(l);out.push(l);
     if(m.place_id)existingId[m.place_id]=1;
@@ -1748,15 +1737,16 @@ function readSearchParams(){
     radio:parseInt((el('fRadio')&&el('fRadio').value)||'0',10)||0,
     max:max,
     contacto:(el('fContacto')&&el('fContacto').value)||'cualquiera',
+    motor:(el('fMotor')&&el('fMotor').value)||'auto',
     sinWeb:true,
     cobertura:(el('fCobertura')&&el('fCobertura').value)||'auto',
     programar:!!(el('fProgramar')&&el('fProgramar').checked)
   };
 }
-function setJobProgress(v){const b=document.getElementById('jobBar');if(b)b.style.width=Math.max(0,Math.min(100,v))+'%';const g=document.getElementById('jobBadge');if(g)g.textContent='Apify '+Math.round(v)+'%';}
+function setJobProgress(v){const b=document.getElementById('jobBar');if(b)b.style.width=Math.max(0,Math.min(100,v))+'%';const g=document.getElementById('jobBadge');if(g)g.textContent='Búsqueda '+Math.round(v)+'%';}
 function finishSearchJob(newCount,dup,p,label,job){
   const zonaLabel=p.cellsCount>1?('Toda España · '+p.cellsCount+' provincias'):(p.zona==='Toda España'?'':p.zona);
-  const search={id:uid('s'),user_id:S.user.id,sector:p.sector,zona:zonaLabel,radio:p.radio,estado:'completada',resultados:newCount+dup,nuevos:newCount,duplicados:dup,fecha:new Date().toISOString(),programada:p.programar?'mensual':null,leadIds:[],estilo:null};
+  const search={id:uid('s')+Math.random().toString(36).slice(2,6),user_id:S.user.id,sector:p.sector,zona:zonaLabel,radio:p.radio,estado:'completada',resultados:newCount+dup,nuevos:newCount,duplicados:dup,fecha:new Date().toISOString(),programada:p.programar?'mensual':null,leadIds:[],estilo:null,proveedor:(job&&job.provider)||label,params:{sector:p.sector,zona:p.zona,max:p.max,contacto:p.contacto,motor:p.motor||'auto'},stats:(job&&job.stats)||null};
   if(job&&Array.isArray(job.imported)){
     job.imported.forEach(function(l){if(l&&l.id){search.leadIds.push(l.id);l.search_id=search.id;}});
   }
@@ -1816,7 +1806,7 @@ function startApifySearch(){
   const perCell=Math.max(1,Math.min(60,Math.ceil((p.max||60)/cells.length)));
   const job={cells:cells,perCell:perCell,idx:0,found:0,dup:0,paused:false,cancelled:false,ac:null,errors:[],imported:[],stats:{sinNombre:0,fueraEspana:0,duplicado:0,conWeb:0,sinContacto:0}};
   S.job=job;
-  const t=document.getElementById('jobTitle');if(t)t.textContent='Consultando Apify · '+p.sector+(cells.length>1?(' · '+cells.length+' provincias'):(p.zona!=='Toda España'?(' en '+p.zona):''));
+  const t=document.getElementById('jobTitle');if(t)t.textContent='Buscando · '+p.sector+(cells.length>1?(' · '+cells.length+' provincias'):(p.zona!=='Toda España'?(' en '+p.zona):''));
   const prev=document.getElementById('jobResultsBtn');if(prev)prev.remove();
   const prevOffer=document.getElementById('jobOfferBtn');if(prevOffer)prevOffer.remove();
   const br=document.getElementById('jobBreakdown');if(br)br.textContent='';
@@ -1825,9 +1815,9 @@ function startApifySearch(){
   if(pause){pause.style.display='';pause.innerHTML=icon('pause','sm')+' Pausar';}
   if(cancel)cancel.style.display='';
   function upd(){
-    const pct=cells.length?(job.idx/cells.length*100):0;
+    const pct=cells.length?((job.done||0)/cells.length*100):0;
     setJobProgress(pct);
-    const cur=cells[Math.min(job.idx,cells.length-1)]||{label:''};
+    const cur=cells[Math.min(Math.max(0,job.idx-1),cells.length-1)]||{label:''};
     const c=document.getElementById('jobCell');
     if(c)c.textContent=(cells.length>1?'Provincia ':'Zona ')+Math.min(job.idx+1,cells.length)+'/'+cells.length+' · '+cur.label+(job.perCell<60?(' · hasta '+job.perCell+'/celda'):'');
     const f=document.getElementById('jobFound');if(f)f.textContent='Leads nuevos: '+job.found;
@@ -1838,37 +1828,44 @@ function startApifySearch(){
     cancelJob();
     p.cellsCount=cells.length;
     if(job.imported.length)syncLeadsToBackend(job.imported);
-    finishSearchJob(job.found,job.dup,p,'Apify'+(cells.length>1?(' · '+cells.length+' provincias'):''),job);
+    const provLabel=job.provider==='google'?'Google Places':'Apify';
+    finishSearchJob(job.found,job.dup,p,provLabel+(cells.length>1?(' · '+cells.length+' zonas'):''),job);
     if(partial){const f=document.getElementById('jobFound');if(f)f.textContent='Leads importados: '+job.found+' · interrumpido';}
   }
-  function next(){
+  /* v1.3.0: varias zonas a la vez (antes, una detrás de otra). */
+  const CONC=Math.max(1,Math.min(cells.length,backendConfigured()?(p.motor==='apify'?3:4):2));
+  job.active=0;job.done=0;job.acs=[];
+  job.ac={abort:function(){job.acs.forEach(function(a){try{a&&a.abort();}catch(e){}});}};
+  function worker(){
     if(job.cancelled||job.paused)return;
-    if(job.idx>=cells.length){done();return;}
-    const cell=cells[job.idx];
+    if(job.idx>=cells.length){if(job.active===0&&!job.finished){job.finished=true;done(job.errors.length>0&&job.found===0);}return;}
+    const cell=cells[job.idx++];job.active++;
     const cp=Object.assign({},p,{zona:cell.zona,max:job.perCell});
-    const ac=(typeof AbortController!=='undefined')?new AbortController():null;job.ac=ac;
+    const ac=(typeof AbortController!=='undefined')?new AbortController():null;job.acs.push(ac);
     apifyFetchItems(cp,ac).then(function(items){
       if(job.cancelled)return;
+      if(items&&items.provider)job.provider=items.provider;
       const r=importApifyItems(items,cp);
       job.found+=r.leads.length;job.dup+=r.dup;
       job.imported=job.imported.concat(r.leads);
       Object.keys(job.stats).forEach(function(k){job.stats[k]+=(r.stats&&r.stats[k])||0;});
-      job.idx++;upd();
-      next();
     }).catch(function(err){
       if(job.cancelled)return;
       const hint=apifyErrorHint(err);
       job.errors.push(cell.label+': '+hint);
-      if(err.status===401||err.status===402||err.status===403){
-        job.cancelled=true;cancelJob();
-        toast('Apify: '+hint,'err');
-        if(job.found||job.dup){done(true);}else{panel.style.display='none';}
-        return;
+      if(err.status===401||err.status===402||err.status===403||err.status===503){
+        job.cancelled=true;job.ac.abort();cancelJob();
+        toast('Búsqueda: '+hint,'err');
+        if(job.found||job.dup){job.finished=true;done(true);}else{panel.style.display='none';}
+        return 'stop';
       }
-      job.idx++;upd();
-      if(job.idx>=cells.length){done(true);}else{next();}
+    }).then(function(stop){
+      job.active--;job.done++;upd();
+      if(stop==='stop'||job.cancelled)return;
+      worker();
     });
   }
+  function next(){for(let i=job.active;i<CONC;i++)worker();}
   if(pause)pause.onclick=function(){job.paused=!job.paused;pause.innerHTML=job.paused?(icon('play','sm')+' Reanudar'):(icon('pause','sm')+' Pausar');if(!job.paused)next();upd();};
   if(cancel)cancel.onclick=function(){job.cancelled=true;if(job.ac&&job.ac.abort)job.ac.abort();cancelJob();if(panel)panel.style.display='none';toast('Búsqueda cancelada','warn');};
   upd();
@@ -1972,7 +1969,7 @@ function loadDatasetFile(input){
 function bindDelegates(){
   document.addEventListener('click',function(e){
     if(e.target.closest('[data-select],#selAll'))return;
-    const t=e.target.closest('[data-go],[data-filter],[data-webfilter],[data-bulkassign],[data-tab],[data-estado],[data-call],[data-demo],[data-send],[data-addnote],[data-ticket],[data-edituser],[data-tfilter],[data-newticket],[data-toggle-nocontact],[data-reassign],[data-next],[data-score],[data-newarticle],[data-kbview],[data-source],[data-webhooktest],[data-notif],[data-demoopen],[data-web],[data-copyprompt],[data-del-lead],[data-del-search],[data-undo-search],#exportLeads,#exportClients,#runSearch,#resetSearch,#quickSearch,#importDataset,#newUser,#apifySave,#apifyClear,#apifyTest,#apiSave,#apiClear,#apiLogin,#apiLogout,#aiSave,#aiClear,#dbExport,#dbImportBtn,#bulkAssign,#bulkStatus,#bulkNoContact,#bulkExport,#bulkDelete,#bulkClear,#selectAllBtn,#undoLastSearch,#clearSearchHistory');
+    const t=e.target.closest('[data-go],[data-filter],[data-webfilter],[data-bulkassign],[data-tab],[data-estado],[data-call],[data-demo],[data-send],[data-addnote],[data-ticket],[data-edituser],[data-tfilter],[data-newticket],[data-toggle-nocontact],[data-reassign],[data-next],[data-score],[data-newarticle],[data-kbview],[data-source],[data-webhooktest],[data-notif],[data-demoopen],[data-web],[data-copyprompt],[data-del-lead],[data-del-search],[data-undo-search],#exportLeads,#exportClients,#runSearch,#resetSearch,#quickSearch,#importDataset,#newUser,#apifySave,#apifyClear,#apifyTest,#apiSave,#apiClear,#apiLogin,#apiLogout,#syncNow,#aiSave,#aiClear,#dbExport,#dbImportBtn,#bulkAssign,#bulkStatus,#bulkNoContact,#bulkExport,#bulkDelete,#bulkClear,#selectAllBtn,#undoLastSearch,#clearSearchHistory');
     if(!t)return;
     if(t.hasAttribute('data-go')){go(t.getAttribute('data-go'));return;}
     if(t.hasAttribute('data-filter')){clearLeadSel();S.filters.lead=t.getAttribute('data-filter');render();return;}
@@ -2010,6 +2007,7 @@ function bindDelegates(){
     if(t.id==='apiClear'){clearApiBase();return;}
     if(t.id==='apiLogin'){backendLogin();return;}
     if(t.id==='apiLogout'){backendLogout();return;}
+    if(t.id==='syncNow'){toast('Sincronizando…','ok');syncNow().then(function(){toast(SYNC.status==='ok'?'Sincronizado con el servidor':'No se pudo sincronizar: '+SYNC.error,SYNC.status==='ok'?'ok':'err');render();});return;}
     if(t.id==='resetSearch'){['fSector','fZona'].forEach(i=>{const el=$('#'+i);if(el)el.value='';});return;}
     if(t.id==='exportLeads'){exportCSV('leads');return;}
     if(t.id==='exportClients'){exportCSV('clientes');return;}
@@ -2061,6 +2059,9 @@ function sendDemo(id){
   const d=l.demos[l.demos.length-1];if(d){d.estado='enviada';d.enviada_en=new Date().toISOString();}
   l.interactions.push({id:uid('i'),user_id:S.user.id,tipo:ch==='whatsapp'?'whatsapp':'email',resultado:null,nota:'Demo enviada por '+ch+'.',fecha:new Date().toISOString()});
   audits('demos','send',null,{lead:id,canal:ch});
+  if(ch==='whatsapp'&&l.telefono){window.open('https://wa.me/'+waNumber(l.telefono)+'?text='+encodeURIComponent(msg),'_blank');}
+  else if(ch==='email'&&l.email){window.location.href='mailto:'+encodeURIComponent(l.email)+'?subject='+encodeURIComponent('Propuesta de web para '+l.nombre)+'&body='+encodeURIComponent(msg);}
+  else{toast('Este lead no tiene '+(ch==='whatsapp'?'teléfono':'email'),'warn');}
   toast('Demo enviada por '+ch,'ok');render();
 }
 function exportCSV(kind,subset){
@@ -2146,7 +2147,7 @@ function openCallModal(id){
 }
 
 /* --- generar demo --- */
-function openDemoModal(id){
+function legacyDemoModal(id){
   const l=leadById(id);
   modal({title:'Generar demo · '+l.nombre,body:
     '<p class="muted small" style="margin-top:0">Se crea una demo a partir de los datos y fotos de la ficha. Caduca automáticamente y cuenta visitas.</p>'+
@@ -2392,7 +2393,7 @@ function leadSources(l){
     {ok:backendConfigured(),label:'Análisis de enlaces',detail:backendConfigured()?'backend conectado':'configura el backend'}
   ];
 }
-function openLeadWebModal(id, active){
+function legacyLeadWebModal(id, active){
   const l=leadById(id);if(!l)return;
   const slug=webSlug(l);
   const img=leadImage(l);
@@ -2710,51 +2711,94 @@ function searchLeadIds(s){
   if(Array.isArray(s.leadIds)&&s.leadIds.length)return s.leadIds.slice();
   return DB.leads.filter(function(l){return l.search_id===s.id;}).map(function(l){return l.id;});
 }
+/* v1.3.1: deshacer cualquier búsqueda. Se hace en el servidor (para todo el
+   equipo) y se conservan los leads que ya se han trabajado. */
+function leadWorked(l){
+  if(l.no_contactar)return 'marcado «no contactar»';
+  if(l.estado&&l.estado!=='nuevo')return 'estado «'+((ESTADOS[l.estado]||{}).label||l.estado)+'»';
+  if((l.intentos||0)>0)return 'tiene llamadas';
+  if((l.interactions||[]).some(function(i){return i.user_id&&i.user_id!=='system';}))return 'tiene notas o llamadas';
+  if((l.demos||[]).length)return 'tiene demo';
+  if(DB.customers.some(function(c){return c.lead_id===l.id;}))return 'es cliente';
+  return '';
+}
 function undoLastSearch(searchId){
   const s=searchId?DB.searches.find(function(x){return x.id===searchId;}):DB.searches.slice().sort(function(a,b){return new Date(b.fecha)-new Date(a.fecha);})[0];
   if(!s){toast('No hay búsquedas que deshacer','warn');return;}
-  const ids=searchLeadIds(s);
-  const leads=ids.map(leadById).filter(Boolean);
-  const protectedRows=leads.filter(function(l){return l.estado==='convertido'||DB.customers.some(function(c){return c.lead_id===l.id;});});
-  const deletable=leads.filter(function(l){return protectedRows.indexOf(l)<0;});
-  modal({title:'Deshacer búsqueda · '+s.sector,body:
-    '<div class="notice" style="border-color:var(--warn)">'+icon('alert','sm')+'<span class="small">Se eliminarán <b>'+deletable.length+' leads</b> importados por esta búsqueda y su entrada del historial.'+(protectedRows.length?' Se conservarán '+protectedRows.length+' leads convertidos o con cliente.':'')+'</span></div>'+
-    '<p class="small muted mt8">'+(deletable.length?deletable.slice(0,10).map(function(l){return esc(l.nombre);}).join(' · ')+(deletable.length>10?' …':''):'No hay leads eliminables; solo se quitará el historial.')+'</p>'+
-    '<div class="notice mt16">'+icon('info','sm')+'<span class="small">Los leads que hayas convertido, editado o asignado a un cliente no se borran.</span></div>',
+  const leads=searchLeadIds(s).map(leadById).filter(Boolean).filter(function(l){return l.search_id===s.id||!l.search_id;});
+  const kept=leads.filter(function(l){return !!leadWorked(l);});
+  const deletable=leads.filter(function(l){return !leadWorked(l);});
+  const online=syncReady();
+  modal({title:'Deshacer búsqueda · '+s.sector+(s.zona?(' · '+s.zona):''),body:
+    '<div class="notice" style="border-color:var(--warn)">'+icon('alert','sm')+'<span class="small">Se borrará'+(deletable.length===1?'':'n')+' <b>'+deletable.length+(deletable.length===1?' lead':' leads')+'</b> que trajo esta búsqueda y todavía no se han trabajado, y la búsqueda saldrá del historial'+(online?' <b>para todo el equipo</b>':'')+'.</span></div>'+
+    (deletable.length?'<p class="small muted mt8">'+deletable.slice(0,12).map(function(l){return esc(l.nombre);}).join(' · ')+(deletable.length>12?' …':'')+'</p>':'')+
+    (kept.length?'<div class="notice mt16">'+icon('info','sm')+'<span class="small">Se conservan <b>'+kept.length+'</b> porque ya se han trabajado: '+kept.slice(0,6).map(function(l){return esc(l.nombre)+' ('+esc(leadWorked(l))+')';}).join(', ')+(kept.length>6?' …':'')+'.</span></div>':'')+
+    '<p class="tiny muted mt8">Los negocios que ya estaban en el CRM antes de esta búsqueda no se tocan.</p>',
     footer:'<button class="btn" data-close="1">Cancelar</button><button class="btn primary" id="undoSearchConfirm" style="background:var(--warn);border-color:var(--warn)">'+icon('refresh','sm')+' Deshacer búsqueda</button>',
     onMount(root){
       $('#undoSearchConfirm',root).onclick=function(){
-        const set={};deletable.forEach(function(l){set[l.id]=1;});
-        DB.leads=DB.leads.filter(function(l){return !set[l.id];});
-        DB.searches=DB.searches.filter(function(x){return x.id!==s.id;});
-        audits('searches','delete',{sector:s.sector,nuevos:s.nuevos},null);
-        clearLeadSel();persistDB();closeModal();render();
-        toast('Búsqueda deshecha: '+deletable.length+' leads eliminados'+(protectedRows.length?(' · '+protectedRows.length+' conservados'):''),'ok');
+        const btn=this;btn.disabled=true;btn.innerHTML=icon('refresh','sm')+' Deshaciendo…';
+        function finishLocal(serverDeleted,serverKept){
+          const del={};
+          deletable.forEach(function(l){if(!l.server_id||!serverDeleted||serverDeleted[l.server_id])del[l.id]=1;});
+          if(serverDeleted)DB.leads.forEach(function(l){if(l.server_id&&serverDeleted[l.server_id])del[l.id]=1;});
+          const st=syncState();
+          DB.leads.forEach(function(l){if(del[l.id]&&l.server_id)delete st.shadow[l.server_id];});
+          saveSyncState();
+          DB.leads=DB.leads.filter(function(l){return !del[l.id];});
+          DB.leads.forEach(function(l){if(l.search_id===s.id)l.search_id=null;});
+          DB.searches=DB.searches.filter(function(x){return x.id!==s.id;});
+          audits('searches','undo',{sector:s.sector,zona:s.zona,nuevos:s.nuevos},{borrados:Object.keys(del).length});
+          clearLeadSel();persistDB();closeModal();render();
+          const n=Object.keys(del).length;const k=serverKept!=null?serverKept:kept.length;
+          toast('Búsqueda deshecha: '+n+(n===1?' lead borrado':' leads borrados')+(k?(' · '+k+' conservados por estar trabajados'):''),'ok');
+        }
+        if(!online){finishLocal(null,null);return;}
+        /* Primero se sube lo pendiente (para que el servidor sepa qué trajo la búsqueda). */
+        syncNow().then(function(){
+          return apiJSON('POST','/api/searches/'+encodeURIComponent(s.id)+'/undo',{});
+        }).then(function(j){
+          const d={};(j.deleted||[]).forEach(function(id){d[id]=1;});
+          finishLocal(d,(j.kept||[]).length);
+        }).catch(function(e){
+          btn.disabled=false;btn.innerHTML=icon('refresh','sm')+' Deshacer búsqueda';
+          toast('No se pudo deshacer en el servidor: '+e.message,'err');
+        });
       };
     }});
 }
 function deleteSearch(id){
   const s=DB.searches.find(function(x){return x.id===id;});if(!s)return;
-  modal({title:'Eliminar búsqueda del historial',body:
-    '<div class="notice">'+icon('info','sm')+'<span class="small">Se quitará «'+esc(s.sector)+'» del historial. <b>Los leads importados se conservan.</b> Para borrarlos también, usa «Deshacer búsqueda».</span></div>',
-    footer:'<button class="btn" data-close="1">Cancelar</button><button class="btn primary" id="delSearchConfirm" style="background:var(--danger);border-color:var(--danger)">'+icon('trash','sm')+' Eliminar del historial</button>',
+  modal({title:'Quitar búsqueda del historial',body:
+    '<div class="notice">'+icon('info','sm')+'<span class="small">Se quitará «'+esc(s.sector)+'» del historial. <b>Los leads se conservan.</b> Para borrarlos también, usa «Deshacer».</span></div>',
+    footer:'<button class="btn" data-close="1">Cancelar</button><button class="btn primary" id="delSearchConfirm" style="background:var(--danger);border-color:var(--danger)">'+icon('trash','sm')+' Quitar del historial</button>',
     onMount(root){
       $('#delSearchConfirm',root).onclick=function(){
-        DB.searches=DB.searches.filter(function(x){return x.id!==id;});
-        audits('searches','delete',{sector:s.sector},null);
-        persistDB();closeModal();render();toast('Búsqueda eliminada del historial; los leads se conservan','ok');
+        const done=function(){
+          DB.searches=DB.searches.filter(function(x){return x.id!==id;});
+          DB.leads.forEach(function(l){if(l.search_id===id)l.search_id=null;});
+          audits('searches','delete',{sector:s.sector},null);
+          persistDB();closeModal();render();toast('Búsqueda quitada del historial; los leads se conservan','ok');
+        };
+        if(syncReady()&&s.synced)apiJSON('DELETE','/api/searches/'+encodeURIComponent(id)).then(done).catch(function(e){toast('No se pudo quitar en el servidor: '+e.message,'err');});
+        else done();
       };
     }});
 }
 function clearSearchHistory(){
   if(!DB.searches.length){toast('El historial ya está vacío','warn');return;}
   modal({title:'Vaciar historial de búsquedas',body:
-    '<div class="notice" style="border-color:var(--warn)">'+icon('alert','sm')+'<span class="small">Se eliminarán <b>'+DB.searches.length+' entradas</b> del historial. <b>Los leads no se borran.</b></span></div>',
+    '<div class="notice" style="border-color:var(--warn)">'+icon('alert','sm')+'<span class="small">Se quitarán <b>'+DB.searches.length+' búsquedas</b> del historial. <b>Los leads no se borran.</b></span></div>',
     footer:'<button class="btn" data-close="1">Cancelar</button><button class="btn primary" id="clearSearchConfirm" style="background:var(--danger);border-color:var(--danger)">'+icon('trash','sm')+' Vaciar historial</button>',
     onMount(root){
       $('#clearSearchConfirm',root).onclick=function(){
-        DB.searches=[];audits('searches','delete',null,{all:true});
-        persistDB();closeModal();render();toast('Historial vaciado; los leads se conservan','ok');
+        const ids=DB.searches.filter(function(x){return x.synced;}).map(function(x){return x.id;});
+        const remote=syncReady()?Promise.all(ids.map(function(id){return apiJSON('DELETE','/api/searches/'+encodeURIComponent(id)).catch(function(){return null;});})):Promise.resolve();
+        remote.then(function(){
+          DB.searches=[];DB.leads.forEach(function(l){l.search_id=null;});
+          audits('searches','delete',null,{all:true});
+          persistDB();closeModal();render();toast('Historial vaciado; los leads se conservan','ok');
+        });
       };
     }});
 }
@@ -2879,6 +2923,409 @@ function aiReply(q){
 }
 
 /* =========================================================================
+   SERVIDOR COMO FUENTE DE VERDAD (v1.3.0)
+   Todo lo que se hace en el navegador se sube al servidor y lo que hacen los
+   demás se baja cada 30 s. localStorage queda como caché sin conexión.
+   ========================================================================= */
+const SYNC_FIELDS=['estado','motivo_descarte','asignado_a','proxima_accion','proxima_tipo','intentos','no_contactar','descripcion_ia','score','email','telefono','search_id'];
+const PENDING_RAW={};
+const SYNC={running:false,again:false,timer:null,debounce:null,state:null,status:'idle',error:'',lastOk:null,count:0,inSync:false,lastRaw:null,needRender:false,refetch:{}};
+function sidOf(l){return l&&l.server_id?l.server_id:null;}
+function syncKey(){const s=settings();return apiBase()+'|'+((s.apiUser&&s.apiUser.id)||'');}
+function syncState(){
+  if(SYNC.state&&SYNC.state.key===syncKey())return SYNC.state;
+  let o=null;try{o=JSON.parse(localStorage.getItem('od.sync')||'null');}catch(e){}
+  if(!o||typeof o!=='object'||o.key!==syncKey())o={key:syncKey(),shadow:{},lastPull:null};
+  if(!o.shadow||typeof o.shadow!=='object')o.shadow={};
+  SYNC.state=o;return o;
+}
+function saveSyncState(){try{localStorage.setItem('od.sync',JSON.stringify(SYNC.state||{}));}catch(e){}}
+function localFields(l){
+  const o={};
+  SYNC_FIELDS.forEach(function(k){
+    let v=l[k];if(v===undefined||v==='')v=null;
+    if(k==='intentos')v=parseInt(v,10)||0;
+    else if(k==='no_contactar')v=!!v;
+    else if(k==='score')v=(v===null||isNaN(Number(v)))?null:Math.max(0,Math.min(100,Math.round(Number(v))));
+    else if(k==='proxima_accion'&&v){const d=new Date(v);v=isNaN(d.getTime())?null:d.toISOString();}
+    else if(k==='estado'&&ESTADOS_LEAD.indexOf(v)<0)v='nuevo';
+    else if(v!==null&&typeof v!=='boolean')v=String(v);
+    o[k]=v;
+  });
+  return o;
+}
+function fieldsHash(o){return JSON.stringify(SYNC_FIELDS.map(function(k){return o[k]===undefined?null:o[k];}));}
+function isPending(l){const st=syncState();const sid=sidOf(l);if(!sid)return true;const sh=st.shadow[sid];return sh!==undefined&&fieldsHash(localFields(l))!==sh;}
+function apiJSON(method,path,body,ms){
+  const ctrl=(typeof AbortController!=='undefined')?new AbortController():null;
+  const t=setTimeout(function(){if(ctrl)ctrl.abort();},ms||60000);
+  const opt={method:method,headers:apiHeaders(body!==undefined)};
+  if(body!==undefined)opt.body=JSON.stringify(body);
+  if(ctrl)opt.signal=ctrl.signal;
+  return fetch(apiBase()+path,opt).then(function(res){
+    return res.json().catch(function(){return {};}).then(function(j){
+      if(!res.ok){apiAuthFailed(res);const e=new Error((j&&j.error)||('HTTP '+res.status));e.status=res.status;throw e;}
+      return j;
+    });
+  }).finally(function(){clearTimeout(t);});
+}
+function leadPayload(l){
+  return {id:l.id,place_id:l.place_id||null,nombre:l.nombre,sector:l.sector,direccion:l.direccion,ciudad:l.ciudad,lat:l.lat,lng:l.lng,
+    telefono:l.telefono,email:l.email,web_tipo:l.web_tipo,redes:l.redes,rating:l.rating,resenas:l.resenas,horario:l.horario,maps:l.maps,
+    descripcion_ia:l.descripcion_ia,score:l.score,fuente:l.fuente,image_url:l.image_url||null,estado:l.estado,motivo_descarte:l.motivo_descarte,
+    asignado_a:l.asignado_a,search_id:l.search_id,proxima_accion:localFields(l).proxima_accion,proxima_tipo:l.proxima_tipo,intentos:l.intentos,
+    no_contactar:!!l.no_contactar,raw:PENDING_RAW[l.id]||undefined};
+}
+function fromServerLead(r){
+  return {id:r.id,server_id:r.id,place_id:r.place_id,nombre:r.nombre,sector:r.sector||'Negocio',direccion:r.direccion||'',ciudad:r.ciudad||'',
+    lat:r.lat,lng:r.lng,telefono:r.telefono||'',email:r.email||'',web_detectada:!!r.web_detectada,web_tipo:r.web_tipo||null,
+    redes:Array.isArray(r.redes)?r.redes:[],rating:Number(r.rating)||0,resenas:r.resenas||0,horario:r.horario||'',maps:r.maps||'',
+    descripcion_ia:r.descripcion_ia||'',score:r.score==null?0:r.score,estado:r.estado||'nuevo',motivo_descarte:r.motivo_descarte||null,
+    asignado_a:r.asignado_a||null,search_id:r.search_id||null,proxima_accion:r.proxima_accion||null,proxima_tipo:r.proxima_tipo||null,
+    intentos:r.intentos||0,no_contactar:!!r.no_contactar,fuente:r.fuente||'Servidor',fotos:[],image_url:r.image_url||null,
+    created_at:r.created_at||new Date().toISOString(),interactions:[],demos:[],calls:[]};
+}
+function applyServerLead(l,r,overwriteCrm){
+  ['nombre','sector','direccion','ciudad','lat','lng','web_tipo','horario','maps','image_url','place_id'].forEach(function(k){if(r[k]!==null&&r[k]!==undefined&&r[k]!=='')l[k]=r[k];});
+  if(r.rating!==null&&r.rating!==undefined)l.rating=Number(r.rating)||0;
+  if(r.resenas!==null&&r.resenas!==undefined)l.resenas=r.resenas;
+  if(Array.isArray(r.redes)&&r.redes.length)l.redes=r.redes;
+  if(overwriteCrm){
+    SYNC_FIELDS.forEach(function(k){l[k]=(r[k]===undefined?null:r[k]);});
+    l.score=r.score==null?(l.score||0):r.score;l.descripcion_ia=r.descripcion_ia||l.descripcion_ia||'';
+    l.telefono=r.telefono||'';l.email=r.email||'';
+  }
+}
+function mergeServerInteractions(l,its){
+  if(!Array.isArray(its)||!its.length)return false;
+  let added=false;
+  its.forEach(function(it){
+    if(it.client_ref&&l.interactions.some(function(i){return i.id===it.client_ref;}))return;
+    if(l.interactions.some(function(i){return i.srv===it.id;}))return;
+    l.interactions.push({id:'srv-'+it.id,srv:it.id,s:1,user_id:it.user_id||'system',tipo:it.tipo,resultado:it.resultado||null,nota:it.nota||'',fecha:it.fecha});
+    added=true;
+  });
+  if(added)l.interactions.sort(function(a,b){return new Date(a.fecha)-new Date(b.fecha);});
+  return added;
+}
+function removeLocalLead(l){const i=DB.leads.indexOf(l);if(i>=0)DB.leads.splice(i,1);}
+
+async function pushNew(){
+  const st=syncState();
+  const pend=DB.leads.filter(function(l){return !l.server_id&&!l.sync_skip;});
+  if(!pend.length)return 0;
+  let excluded=0,adopted=0;
+  for(let i=0;i<pend.length;i+=100){
+    const chunk=pend.slice(i,i+100);
+    const byRef={};chunk.forEach(function(l){byRef[l.id]=l;});
+    const j=await apiJSON('POST','/api/leads',{leads:chunk.map(leadPayload)},120000);
+    const bySid={};DB.leads.forEach(function(l){if(l.server_id)bySid[l.server_id]=l;});
+    (j.leads||[]).forEach(function(r){
+      const l=byRef[r.client_ref];if(!l)return;
+      delete PENDING_RAW[l.id];
+      const twin=bySid[r.id];
+      if(twin&&twin!==l){
+        /* Dos fichas locales del mismo negocio: se fusionan en una. */
+        l.interactions.forEach(function(it){if(!twin.interactions.some(function(x){return x.id===it.id;}))twin.interactions.push(it);});
+        DB.searches.forEach(function(s){if(Array.isArray(s.leadIds))s.leadIds=s.leadIds.map(function(x){return x===l.id?twin.id:x;});});
+        removeLocalLead(l);return;
+      }
+      l.server_id=r.id;bySid[r.id]=l;
+      if(r.image_url&&!l.image_url)l.image_url=r.image_url;
+      if(r.duplicate){
+        if(r.no_contactar&&!l.no_contactar){l.no_contactar=true;adopted++;}
+        if(r.estado&&r.estado!=='nuevo'&&l.estado==='nuevo'){l.estado=r.estado;adopted++;}
+        if(r.asignado_a&&!l.asignado_a)l.asignado_a=r.asignado_a;
+        l.intentos=Math.max(l.intentos||0,r.intentos||0);
+      }
+      const srv=localFields(Object.assign({},l,{estado:r.estado,motivo_descarte:r.motivo_descarte,asignado_a:r.asignado_a,proxima_accion:r.proxima_accion,proxima_tipo:r.proxima_tipo,intentos:r.intentos,no_contactar:r.no_contactar,descripcion_ia:r.descripcion_ia,score:r.score,email:r.email,telefono:r.telefono,search_id:r.search_id}));
+      st.shadow[r.id]=fieldsHash(srv);
+    });
+    (j.excluded||[]).forEach(function(x){
+      const l=byRef[x.client_ref];if(!l)return;
+      l.no_contactar=true;l.sync_skip=true;l.estado='descartado';l.motivo_descarte='Pidió no ser contactado (lista de exclusión)';
+      l.interactions.push({id:uid('i'),user_id:'system',tipo:'estado',resultado:'rechazo',nota:'En la lista de exclusión del servidor: este negocio pidió no ser contactado.',fecha:new Date().toISOString()});
+      excluded++;
+    });
+    (j.errors||[]).forEach(function(x){const l=byRef[x.client_ref];if(l)l.sync_skip=true;});
+  }
+  if(excluded)toast(excluded+' negocios estaban en la lista de exclusión y se han marcado «No contactar»','warn');
+  if(adopted)toast(adopted+' leads ya los gestionaba el equipo: se ha recogido su estado','warn');
+  return pend.length;
+}
+async function pushUpdates(){
+  const st=syncState();
+  const changed=DB.leads.filter(function(l){return l.server_id&&st.shadow[l.server_id]!==undefined&&fieldsHash(localFields(l))!==st.shadow[l.server_id];});
+  if(!changed.length)return 0;
+  const byId={};changed.forEach(function(l){byId[l.server_id]=l;});
+  let firstErr='';
+  for(let i=0;i<changed.length;i+=300){
+    const chunk=changed.slice(i,i+300);
+    const j=await apiJSON('POST','/api/leads/batch',{updates:chunk.map(function(l){return Object.assign({id:l.server_id,log:false},localFields(l));})},120000);
+    (j.results||[]).forEach(function(r){
+      const l=byId[r.id];if(!l)return;
+      if(r.ok){st.shadow[r.id]=fieldsHash(localFields(l));return;}
+      if(r.status===404){delete st.shadow[r.id];removeLocalLead(l);SYNC.needRender=true;return;}
+      if(!firstErr)firstErr=l.nombre+': '+r.error;
+      SYNC.refetch[r.id]=1;st.shadow[r.id]=fieldsHash(localFields(l));
+    });
+  }
+  if(firstErr)toast('El servidor rechazó un cambio y se ha restaurado: '+firstErr,'warn');
+  return changed.length;
+}
+async function pushDeletes(){
+  const st=syncState();
+  const local={};DB.leads.forEach(function(l){if(l.server_id)local[l.server_id]=1;});
+  const gone=Object.keys(st.shadow).filter(function(sid){return !local[sid];});
+  if(!gone.length)return 0;
+  if(!S.user||S.user.rol!=='admin'||!(settings().apiUser&&settings().apiUser.rol==='admin')){
+    /* Solo un admin borra en el servidor; el resto solo lo quita de su vista. */
+    gone.forEach(function(sid){delete st.shadow[sid];});return 0;
+  }
+  for(let i=0;i<gone.length;i+=300){
+    const j=await apiJSON('POST','/api/leads/batch',{deletes:gone.slice(i,i+300)},120000);
+    (j.results||[]).forEach(function(r){if(r.ok)delete st.shadow[r.id];});
+  }
+  return gone.length;
+}
+async function pushInteractions(){
+  const items=[];const ref={};
+  DB.leads.forEach(function(l){
+    if(!l.server_id)return;
+    l.interactions.forEach(function(i){if(i.s||i.srv)return;items.push({lead_id:l.server_id,client_ref:i.id,tipo:i.tipo,resultado:i.resultado,nota:i.nota,fecha:i.fecha,user_id:i.user_id});ref[l.server_id+'|'+i.id]=i;});
+  });
+  if(!items.length)return 0;
+  for(let k=0;k<items.length;k+=1000){
+    const chunk=items.slice(k,k+1000);
+    await apiJSON('POST','/api/interactions/batch',{items:chunk},120000);
+    /* Hechas o rechazadas (lead ya no visible): no se reintentan en bucle. */
+    chunk.forEach(function(it){const i=ref[it.lead_id+'|'+it.client_ref];if(i)i.s=1;});
+  }
+  return items.length;
+}
+async function pushSearches(){
+  const pend=DB.searches.filter(function(s){return !s.synced;});
+  if(!pend.length)return 0;
+  const body=pend.map(function(s){
+    return {id:s.id,sector:s.sector,zona:s.zona,radio:s.radio,estado:s.estado,resultados:s.resultados,nuevos:s.nuevos,duplicados:s.duplicados,programada:s.programada,
+      proveedor:s.proveedor||null,params:s.params||null,stats:s.stats||null,fecha:s.fecha,
+      lead_ids:(s.leadIds||[]).map(function(id){const l=leadById(id);return l&&l.server_id;}).filter(Boolean)};
+  });
+  await apiJSON('POST','/api/searches',{searches:body},60000);
+  pend.forEach(function(s){s.synced=1;});
+  return pend.length;
+}
+async function pullChanges(){
+  const st=syncState();
+  const since=st.lastPull;
+  const bySid={};DB.leads.forEach(function(l){if(l.server_id)bySid[l.server_id]=l;});
+  let offset=0,serverTime=null,changed=0;
+  for(;;){
+    const j=await apiJSON('GET','/api/leads?limit=500&offset='+offset+'&with_interactions=1'+(since?('&updated_since='+encodeURIComponent(since)):''),undefined,120000);
+    if(!serverTime)serverTime=j.server_time;
+    const its=j.interactions||{};
+    (j.leads||[]).forEach(function(r){
+      let l=bySid[r.id];
+      if(!l){l=fromServerLead(r);DB.leads.push(l);bySid[r.id]=l;st.shadow[r.id]=fieldsHash(localFields(l));mergeServerInteractions(l,its[r.id]);changed++;return;}
+      const sh=st.shadow[r.id];
+      const pending=sh!==undefined&&fieldsHash(localFields(l))!==sh;
+      const force=!!SYNC.refetch[r.id];
+      applyServerLead(l,r,!pending||force);
+      if(!pending||force){st.shadow[r.id]=fieldsHash(localFields(l));delete SYNC.refetch[r.id];}
+      mergeServerInteractions(l,its[r.id]);
+      changed++;
+    });
+    if((j.leads||[]).length<500)break;
+    offset+=500;
+  }
+  /* Cambios rechazados que no han vuelto en el incremental: se piden uno a uno. */
+  for(const sid of Object.keys(SYNC.refetch)){
+    try{const j=await apiJSON('GET','/api/leads/'+encodeURIComponent(sid));const l=bySid[sid];if(l){applyServerLead(l,j.lead,true);st.shadow[sid]=fieldsHash(localFields(l));changed++;}}catch(e){}
+    delete SYNC.refetch[sid];
+  }
+  if(serverTime)st.lastPull=new Date(new Date(serverTime).getTime()-5000).toISOString();
+  return changed;
+}
+async function checkVisibleIds(){
+  const st=syncState();
+  const j=await apiJSON('GET','/api/leads/ids');
+  const set={};(j.ids||[]).forEach(function(id){set[id]=1;});
+  let removed=0;
+  DB.leads.slice().forEach(function(l){
+    if(l.server_id&&!set[l.server_id]&&!isPending(l)){delete st.shadow[l.server_id];removeLocalLead(l);removed++;}
+  });
+  return removed;
+}
+function syncReady(){return backendConfigured()&&backendLogged()&&!!S.user;}
+async function syncNow(){
+  if(!syncReady())return;
+  if(SYNC.running){SYNC.again=true;return;}
+  SYNC.running=true;SYNC.status='syncing';updateSaveState(true);
+  const st=syncState();const first=!st.lastPull;
+  let pulled=0,pushed=0;
+  try{
+    if(!SYNC.server){try{SYNC.server=await apiJSON('GET','/api/config');SYNC.needRender=true;}catch(e){}}
+    pushed+=await pushNew();
+    pushed+=await pushUpdates();
+    pushed+=await pushDeletes();
+    pushed+=await pushInteractions();
+    pushed+=await pushSearches();
+    pulled+=await pullChanges();
+    SYNC.count++;
+    if(first||SYNC.count%6===0)pulled+=await checkVisibleIds();
+    SYNC.status='ok';SYNC.error='';SYNC.lastOk=new Date().toISOString();
+    if(first&&pushed)toast('Datos subidos al servidor: ya los ve el resto del equipo','ok');
+  }catch(e){
+    SYNC.status='error';SYNC.error=(e&&e.message)||'sin conexión';
+  }finally{
+    SYNC.running=false;
+    saveSyncState();
+    SYNC.inSync=true;persistDB();SYNC.inSync=false;
+    updateSaveState(true);
+    if(pulled||SYNC.needRender){
+      SYNC.needRender=false;
+      const a=document.activeElement;const app=document.getElementById('app');
+      const typing=a&&app&&app.contains(a)&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);
+      if(typing)SYNC.needRender=true;else{SYNC.inSync=true;render();SYNC.inSync=false;}
+    }
+    if(SYNC.again){SYNC.again=false;setTimeout(syncNow,400);}
+  }
+}
+function scheduleSync(){
+  if(!syncReady())return;
+  clearTimeout(SYNC.debounce);
+  SYNC.debounce=setTimeout(syncNow,1200);
+}
+function startSyncLoop(){
+  if(SYNC.timer)return;
+  SYNC.timer=setInterval(function(){if(document.visibilityState==='visible')syncNow();},30000);
+  document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')syncNow();});
+  window.addEventListener('online',function(){syncNow();});
+  setTimeout(syncNow,800);
+}
+function syncStatusText(){
+  if(!backendConfigured())return '';
+  if(!backendLogged())return ' · Servidor: sin sesión';
+  const pend=DB.leads.filter(function(l){return !l.sync_skip&&isPending(l);}).length;
+  if(SYNC.status==='syncing')return ' · Sincronizando…';
+  if(SYNC.status==='error')return ' · Servidor: sin conexión'+(pend?(' ('+pend+' pendientes)'):'');
+  if(SYNC.lastOk)return ' · Servidor '+fmtDateTime(SYNC.lastOk).split(' · ').pop()+(pend?(' · '+pend+' pendientes'):'');
+  return pend?(' · '+pend+' pendientes de subir'):'';
+}
+
+/* =========================================================================
+   FOTOS: foto real del negocio o portada del sector (nunca stock al azar)
+   ========================================================================= */
+const SECTOR_COVERS={'Belleza':['#6D28D9','#DB2777','✂️'],'Automoción':['#0F172A','#2563EB','🔧'],'Restauración':['#9A3412','#DC2626','🍽️'],'Dental':['#0E7490','#2563EB','🦷'],'Salud':['#047857','#0891B2','🩺'],'Fitness':['#111827','#EA580C','🏋️'],'Inmobiliaria':['#1E3A8A','#0EA5E9','🏠'],'Bienestar':['#065F46','#65A30D','🧘'],'Servicios':['#334155','#0284C7','🛠️'],'Tapicería':['#7C2D12','#B45309','🛋️'],'Local':['#1E293B','#475569','🏪']};
+function sectorCover(sector){
+  const meta=sectorMeta(sector);const c=SECTOR_COVERS[meta.plantilla]||SECTOR_COVERS.Local;
+  const label=String(sector||'Negocio local').slice(0,30).replace(/[<>&'"]/g,'');
+  const svg="<svg xmlns='http://www.w3.org/2000/svg' width='1200' height='700' viewBox='0 0 1200 700'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='"+c[0]+"'/><stop offset='1' stop-color='"+c[1]+"'/></linearGradient></defs><rect width='1200' height='700' fill='url(#g)'/><circle cx='1000' cy='110' r='270' fill='#fff' opacity='.07'/><circle cx='140' cy='650' r='230' fill='#fff' opacity='.06'/><text x='600' y='330' font-size='150' text-anchor='middle'>"+c[2]+"</text><text x='600' y='470' font-family='Inter,Arial,sans-serif' font-size='56' font-weight='700' fill='#fff' text-anchor='middle'>"+label+"</text></svg>";
+  return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+}
+function mediaUrl(u){
+  if(!u)return '';u=String(u);
+  if(/^https?:\/\//.test(u)||u.indexOf('data:')===0)return u;
+  if(u.indexOf('/media/')===0)return (apiBase()||'')+u;
+  return '';
+}
+function leadImage(l){return mediaUrl(l&&l.image_url)||sectorCover(l&&l.sector);}
+
+/* =========================================================================
+   DEMOS PARA EL CLIENTE (web con IA + CRM de muestra), publicadas en el servidor
+   ========================================================================= */
+function waNumber(tel){let d=String(tel||'').replace(/\D/g,'');if(d.indexOf('0034')===0)d=d.slice(4);if(d.length===9)d='34'+d;return d;}
+function demoMessage(l,url){return 'Hola, soy '+((S.user&&S.user.nombre)||'')+' de '+DEMO_BRAND+'. Hemos preparado una propuesta de web para '+l.nombre+' con vuestra información de Google. Podéis verla aquí: '+url;}
+const DEMO_BRAND='Emergo';
+function openDemoStudio(id){
+  const l=leadById(id);if(!l)return;
+  if(!backendConfigured()||!backendLogged()){
+    modal({title:'Demo · '+l.nombre,body:'<p class="small">Las demos se generan con IA y se publican en vuestro servidor para poder enviar el enlace al cliente.</p><div class="notice">'+icon('plug','sm')+'<span class="small">Configura la URL del backend e inicia sesión en <b>Administración → Configuración</b>.</span></div>'});
+    return;
+  }
+  if(!l.server_id){
+    toast('Subiendo el lead al servidor…','ok');
+    syncNow().then(function(){const x=leadById(id);if(x&&x.server_id)openDemoStudio(id);else toast('No se pudo subir el lead al servidor. Revisa la conexión.','err');});
+    return;
+  }
+  if(l.no_contactar){toast('Este lead está marcado «No contactar»','warn');return;}
+  modal({wide:true,title:'Demo para el cliente · '+l.nombre,body:
+    '<div class="row gap8 wrap" id="dsSources"><span class="badge">Analizando datos del negocio…</span></div>'+
+    '<p class="small muted mt8">La web se genera con la ficha de Google, sus reseñas y fotos reales y lo que haya en sus redes. Se publica en vuestro dominio para enviar el enlace por WhatsApp. Tarda entre 30 y 90 segundos.</p>'+
+    field('Indicaciones para la IA (opcional)','<textarea class="textarea" id="dsNotes" rows="2" placeholder="Ej.: destaca que abren los sábados, tono familiar, colores sobrios…"></textarea>')+
+    '<div class="row gap8 wrap"><button class="btn primary" id="dsWeb">'+icon('globe','sm')+' Generar web con IA</button><button class="btn outline" id="dsCrm">'+icon('kanban','sm')+' Generar demo de CRM</button><button class="btn ghost" id="dsLovable">'+icon('external','sm')+' Abrir en Lovable</button><button class="btn ghost" id="dsPromptBtn">'+icon('copy','sm')+' Ver prompt</button></div>'+
+    '<div class="tiny muted mt8" id="dsState"></div>'+
+    '<textarea class="textarea mono mt8" id="dsPrompt" readonly style="display:none;min-height:30vh;font-size:12px"></textarea>'+
+    '<div id="dsPreview" class="mt16"></div>'+
+    '<h4 style="margin:18px 0 8px">Demos publicadas</h4><div id="dsList"><span class="tiny muted">Cargando…</span></div>',
+    onMount(root){
+      let preview=null;
+      const state=$('#dsState',root);
+      function notes(){const n=$('#dsNotes',root);return n?n.value.trim():'';}
+      function loadPreview(){
+        return apiJSON('POST','/api/demos/prompt',{lead_id:l.server_id,notas:notes(),analizar:false}).then(function(j){
+          preview=j;const f=j.fuentes||{};
+          const s=$('#dsSources',root);
+          if(s)s.innerHTML=[['Reseñas con texto',f['reseñas']],['Fotos reales',f.fotos],['Redes',f.redes]].map(function(x){return '<span class="badge" style="background:'+(x[1]?'var(--ok-tint)':'var(--surface-3)')+';color:'+(x[1]?'var(--ok)':'var(--muted)')+'">'+esc(x[0])+': '+(x[1]||0)+'</span>';}).join('')+
+            ((f['reseñas']||f.fotos)?'':'<span class="tiny muted">Lead sin reseñas ni fotos (importado antes de la v1.3 o desde Apify sin detalles): vuelve a buscarlo con Google Places para una demo más rica.</span>');
+          return j;
+        });
+      }
+      function demoRow(d){
+        const msg=demoMessage(l,d.url);
+        return '<div class="row gap8 wrap" style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px">'+
+          '<span class="fill"><b class="small">'+(d.tipo==='web'?'Web':'CRM')+'</b> <span class="tiny muted">'+esc(fmtDateTime(d.created_at))+' · '+(d.visitas||0)+' visitas'+(d.ultima_visita?(' · última '+esc(fmtDateTime(d.ultima_visita))):'')+'</span><br><span class="tiny mono">'+esc(d.url)+'</span></span>'+
+          '<a class="btn outline sm" href="'+esc(d.url)+'" target="_blank" rel="noopener">'+icon('external','sm')+' Abrir</a>'+
+          '<button class="btn ghost sm" data-dscopy="'+esc(d.url)+'">'+icon('copy','sm')+' Copiar enlace</button>'+
+          (l.telefono?'<a class="btn ghost sm" target="_blank" rel="noopener" href="https://wa.me/'+waNumber(l.telefono)+'?text='+encodeURIComponent(msg)+'">WhatsApp</a>':'')+'</div>';
+      }
+      function loadList(){
+        return apiJSON('GET','/api/demos?lead_id='+encodeURIComponent(l.server_id)).then(function(j){
+          const box=$('#dsList',root);if(!box)return;
+          const ds=j.demos||[];
+          box.innerHTML=ds.length?ds.map(demoRow).join(''):'<span class="tiny muted">Todavía no hay demos para este negocio.</span>';
+          $$('[data-dscopy]',box).forEach(function(b){b.onclick=function(){fallbackCopy(b.getAttribute('data-dscopy'),function(){toast('Enlace copiado','ok');});};});
+          /* La ficha guarda las demos para el tab «Demos» y el envío. */
+          l.demos=ds.map(function(d){return {id:d.id,tipo:d.tipo,url:d.url,estado:'generada',visitas:d.visitas||0,caduca_en:d.created_at,generada_en:d.created_at,enviada_en:null};});
+          persistDB();
+        }).catch(function(e){const box=$('#dsList',root);if(box)box.innerHTML='<span class="tiny" style="color:var(--danger)">'+esc(e.message)+'</span>';});
+      }
+      function generate(tipo,btn){
+        const old=btn.innerHTML;btn.disabled=true;btn.innerHTML=icon('refresh','sm')+' Generando…';
+        const t0=Date.now();
+        const tick=setInterval(function(){if(state)state.textContent=(tipo==='web'?'La IA está diseñando la web con los datos reales… ':'Preparando la demo de CRM… ')+Math.round((Date.now()-t0)/1000)+' s';},1000);
+        apiJSON('POST','/api/demos',{lead_id:l.server_id,tipo:tipo,notas:notes()},300000).then(function(j){
+          const d=j.demo;
+          if(state)state.textContent='Demo publicada en '+Math.round((Date.now()-t0)/1000)+' s.';
+          const pv=$('#dsPreview',root);
+          if(pv)pv.innerHTML='<iframe title="Vista previa" src="'+esc(d.url)+'" style="width:100%;height:58vh;border:1px solid var(--border);border-radius:10px;background:#fff"></iframe>';
+          if(j.lovable_url&&preview)preview.lovable_url=j.lovable_url;
+          l.interactions.push({id:uid('i'),user_id:S.user.id,tipo:'nota',resultado:null,nota:'Demo '+(tipo==='web'?'web':'de CRM')+' generada: '+d.url,fecha:new Date().toISOString(),s:1});
+          toast('Demo lista: ya puedes enviar el enlace','ok');
+          return loadList();
+        }).catch(function(e){if(state)state.textContent='';toast('No se pudo generar la demo: '+e.message,'err');})
+          .finally(function(){clearInterval(tick);btn.disabled=false;btn.innerHTML=old;});
+      }
+      $('#dsWeb',root).onclick=function(){generate('web',this);};
+      $('#dsCrm',root).onclick=function(){generate('crm',this);};
+      $('#dsPromptBtn',root).onclick=function(){
+        const ta=$('#dsPrompt',root);
+        loadPreview().then(function(j){ta.value=j.prompt||'';ta.style.display='';}).catch(function(e){toast(e.message,'err');});
+      };
+      $('#dsLovable',root).onclick=function(){
+        /* Se abre la pestaña ya (los navegadores bloquean ventanas abiertas tras una espera). */
+        const w=window.open('about:blank','_blank');
+        loadPreview().then(function(j){if(w)w.location=j.lovable_url;else window.open(j.lovable_url,'_blank');toast('Lovable abierto con el prompt y las fotos: pulsa enviar allí','ok');})
+          .catch(function(e){if(w)w.close();toast(e.message,'err');});
+      };
+      loadPreview().catch(function(e){const s=$('#dsSources',root);if(s)s.innerHTML='<span class="tiny" style="color:var(--danger)">'+esc(e.message)+'</span>';});
+      loadList();
+    }});
+}
+function openDemoModal(id){openDemoStudio(id);}
+function openLeadWebModal(id){openDemoStudio(id);}
+
+/* =========================================================================
    INIT
    ========================================================================= */
 bindDelegates();
@@ -2889,6 +3336,7 @@ restoreSettings();
 restoreDB();
 S.route=location.hash||'#/login';
 render();
+if(backendConfigured()&&backendLogged())startSyncLoop();
 const nt=$('#navToggle');if(nt)nt.style.display=window.innerWidth<=960?'inline-flex':'none';
 </script>
 </body>

@@ -102,6 +102,13 @@ function coord(v: unknown, limit: number): number | null {
   return n === null || Math.abs(n) > limit ? null : n;
 }
 
+/** Solo URLs http(s) o del proxy propio; nunca rutas de assets locales. */
+function imageUrl(v: unknown): string | null {
+  const s = optStr(v, 2000);
+  if (!s) return null;
+  return /^https?:\/\//.test(s) || s.startsWith('/media/') ? s : null;
+}
+
 function rawJson(v: unknown): string | null {
   if (v === undefined || v === null) return null;
   try {
@@ -137,6 +144,7 @@ export interface LeadImport {
   score: number | null;
   fuente: string | null;
   fotos: string;
+  image_url: string | null;
   raw: string | null;
   // Campos de gestión: solo se usan al CREAR el lead, nunca al reimportar.
   estado: string;
@@ -192,7 +200,8 @@ export function normalizeImport(input: unknown): { lead?: LeadImport; error?: st
       descripcion_ia: optStr(l.descripcion_ia ?? l.desc, 4000),
       score: optInt(l.score, 0, 100),
       fuente: optStr(l.fuente, 120),
-      fotos: JSON.stringify(strArray(l.fotos, 20, 1000)),
+      fotos: JSON.stringify(strArray(l.fotos, 20, 1000).filter((f) => /^https?:\/\//.test(f) || f.startsWith('/media/'))),
+      image_url: imageUrl(l.image_url ?? l.foto ?? l.imageUrl),
       raw: rawJson(l.raw),
       estado: (ESTADOS_LEAD as readonly string[]).includes(estado) ? estado : 'nuevo',
       motivo_descarte: optStr(l.motivo_descarte, 300),

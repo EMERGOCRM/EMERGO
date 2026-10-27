@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { env, hasApifyToken } from '../env';
+import { env, hasApifyToken, hasGoogle, activeProvider, hasDemoAI } from '../env';
 import { checkApify } from '../apify';
 import { dbEnabled, query } from '../db';
 import { ah, HttpError } from '../http';
@@ -35,6 +35,9 @@ router.get(
     res.json({
       ok: true,
       apify: { configured: hasApifyToken(), actor: await configuredActor() },
+      google: { configured: hasGoogle() },
+      provider: activeProvider(),
+      demos: { configured: hasDemoAI() },
       db: { configured: dbEnabled() },
       sources: ['Google Places', 'Outscraper', 'SerpApi', 'Apify', 'OpenStreetMap', 'Foursquare']
     });
