@@ -1,6 +1,6 @@
 {
   "name": "crm-multimesa-server",
-  "version": "1.3.2",
+  "version": "1.4.1",
   "private": true,
   "description": "Backend API para el CRM multi-escritorio: proxy Apify, persistencia de leads, configuración e IA.",
   "license": "UNLICENSED",

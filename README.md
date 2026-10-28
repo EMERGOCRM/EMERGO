@@ -1,12 +1,28 @@
 # CRM multi-escritorio — backend y despliegue
 
-Prototipo de CRM para captar y digitalizar negocios sin presencia online.
+UTOP-IA CRM: captación de negocios sin presencia online, demos y postventa.
 Este repositorio contiene el frontend estático (`index.html`) **y** el API
 (Node + TypeScript + Express + PostgreSQL) que lo alimenta.
 
 ## Versión
 
-**Versión actual: 1.3.2** (27/10/2026)
+**1.4.1 (28/10/2026) · Marca UTOP-IA y área de empleados**
+
+- El CRM pasa a llamarse UTOP-IA CRM (logo, colores azul marino, textos y demos).
+- Nueva pantalla de acceso para empleados: mostrar/ocultar contraseña, recordar email y ayuda si se olvida la contraseña.
+- La pantalla de acceso se abre en la raíz del CRM y también en `/empleados`.
+- `DEMO_BRAND` por defecto: UTOP-IA.
+
+**1.4.0 (28/10/2026) · Empleados gestionados desde el panel**
+
+- Inicio de sesión real con email y contraseña (desaparecen los perfiles de demostración fijos).
+- Administración → Usuarios y roles: añadir, editar (nombre, email, rol, desk, estado y contraseña) y borrar empleados.
+- Al borrar un empleado, sus leads pasan a otro usuario o quedan sin asignar; su historial se conserva.
+- Protecciones: el admin no puede borrarse ni quitarse el rol a sí mismo y siempre queda al menos un administrador activo.
+- «Mi cuenta» (icono del escudo, abajo a la izquierda): cada usuario cambia su propia contraseña.
+- API nueva: `DELETE /api/users/:id?reasignar_a=`, `POST /api/auth/password`; `PATCH /api/users/:id` acepta `email` y `desk`.
+
+**Versión actual: 1.4.1** (28/10/2026)
 
 - Se muestra en la app (sidebar, login y Configuración) y en `VERSION`.
 - Antes de generar cada ZIP, sube la versión en **los cuatro sitios**:

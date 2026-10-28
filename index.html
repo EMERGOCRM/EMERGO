@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Digitaliza CRM — Multi-desk de captación</title>
+<title>UTOP-IA CRM · Área de empleados</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -44,7 +44,7 @@
 
 :root{
   --ground:#F5F6F8; --surface:#FFFFFF; --surface-2:#FAFBFC; --surface-3:#F0F2F5;
-  --sidebar:#0F141B; --sidebar-2:#171E28; --sidebar-line:#252E3A;
+  --sidebar:#0D1B45; --sidebar-2:#132A66; --sidebar-line:#22386F;
   --sidebar-ink:#9AA5B4; --sidebar-ink-2:#E6EBF2;
   --ink:#0F172A; --ink-2:#2B3444; --muted:#66707F; --muted-2:#8B95A4;
   --border:#E3E7ED; --border-2:#D5DBE4;
@@ -136,7 +136,7 @@ button{font-family:inherit;font-size:inherit;cursor:pointer}
 .shell{display:grid;grid-template-columns:var(--sidebar-w) 1fr;min-height:100vh}
 .sidebar{background:var(--sidebar);color:var(--sidebar-ink);display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
 .brand{display:flex;align-items:center;gap:11px;padding:18px 18px 16px}
-.brand .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(150deg,#3D6BE5,#2F4FB8);display:grid;place-items:center;color:#fff;font-family:var(--f-display);font-weight:700;font-size:17px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
+.brand .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(150deg,#7D95FF,#2547D0);display:grid;place-items:center;color:#fff;font-family:var(--f-display);font-weight:700;font-size:17px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
 .brand .bname{font-family:var(--f-display);font-weight:600;font-size:15.5px;color:#fff;letter-spacing:-.01em;line-height:1.15}
 .brand .bsub{font-size:11px;color:var(--sidebar-ink);letter-spacing:.04em;text-transform:uppercase}
 .nav{flex:1;overflow-y:auto;padding:6px 12px 12px}
@@ -307,10 +307,19 @@ button{font-family:inherit;font-size:inherit;cursor:pointer}
 .notice{display:flex;gap:10px;align-items:center;padding:10px 14px;border-radius:10px;background:var(--surface-3);font-size:13.5px;color:var(--ink-2)}
 
 /* ---------- login ---------- */
+.pw-wrap{position:relative}
+.pw-wrap .input{padding-right:78px}
+.pw-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:var(--muted);font:600 12.5px var(--f-body,inherit);padding:6px 8px;cursor:pointer;border-radius:6px}
+.pw-eye:hover{color:var(--ink);background:var(--surface-3)}
+.lg-help{margin-top:18px;font-size:13px;color:var(--muted);line-height:1.5}
+.lg-secure{margin-top:22px;padding-top:16px;border-top:1px solid var(--line,#E6E9EE);display:flex;gap:8px;align-items:center;font-size:12.5px;color:var(--muted)}
+.lg-mobile-brand{display:none;align-items:center;gap:8px;margin-bottom:22px}
+.lg-mobile-brand .logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(150deg,#7D95FF,#2547D0);color:#fff;display:grid;place-items:center;font-weight:700}
+@media (max-width:900px){.lg-mobile-brand{display:flex}}
 .login{min-height:100vh;display:grid;grid-template-columns:1.05fr .95fr}
 .login-side{background:var(--sidebar);color:#fff;padding:48px;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden}
-.login-side .glow{position:absolute;width:520px;height:520px;border-radius:50%;background:radial-gradient(circle,rgba(61,107,229,.45),transparent 62%);top:-160px;right:-160px;filter:blur(6px)}
-.login-side h1{font-size:38px;line-height:1.1;color:#fff;max-width:11ch}
+.login-side .glow{position:absolute;width:520px;height:520px;border-radius:50%;background:radial-gradient(circle,rgba(125,149,255,.40),transparent 62%);top:-160px;right:-160px;filter:blur(6px)}
+.login-side h1{font-size:38px;line-height:1.1;color:#fff;max-width:16ch}
 .login-side p{color:#AEB8C6;max-width:36ch;margin-top:16px;font-size:15.5px}
 .login-feats{display:flex;flex-direction:column;gap:14px;position:relative}
 .login-feat{display:flex;gap:12px;align-items:center;color:#D6DDE7;font-size:14.5px}
@@ -350,14 +359,14 @@ button{font-family:inherit;font-size:inherit;cursor:pointer}
 <script>
 "use strict";
 /* =========================================================================
-   Digitaliza CRM — prototipo MVP (Fase 1)
+   UTOP-IA CRM
    Multi-desk: Leads · Clientes · Admin. Solo datos reales en memoria (sin demo).
    ========================================================================= */
 
 /* Versión visible de la app. Subir en CADA cambio y mantener sincronizados:
    APP_VERSION (aquí), VERSION, README.md y server/package.json. */
-const APP_VERSION='1.3.2';
-const APP_RELEASE='27/10/2026';
+const APP_VERSION='1.4.1';
+const APP_RELEASE='28/10/2026';
 
 /* ---------- iconos (familia única, trazo 1.8) ---------- */
 const ICONS = {
@@ -499,14 +508,8 @@ function sectorServices(sector){
 const FUENTES=['Google Places','Outscraper','SerpApi','Apify','OpenStreetMap','Foursquare'];
 
 /* ---------- datos semilla ---------- */
-const USERS=[
-  {id:'u1',nombre:'Ana Torres',email:'ana.torres@digitaliza.es',rol:'admin',desk:'todos',activo:true,iniciales:'AT'},
-  {id:'u2',nombre:'Carlos Méndez',email:'carlos.mendez@digitaliza.es',rol:'supervisor',desk:'leads',activo:true,iniciales:'CM'},
-  {id:'u3',nombre:'Lucía Ramírez',email:'lucia.ramirez@digitaliza.es',rol:'comercial',desk:'leads',activo:true,iniciales:'LR'},
-  {id:'u4',nombre:'Javier Ortega',email:'javier.ortega@digitaliza.es',rol:'comercial',desk:'leads',activo:true,iniciales:'JO'},
-  {id:'u5',nombre:'Marta Solís',email:'marta.solis@digitaliza.es',rol:'soporte',desk:'clientes',activo:true,iniciales:'MS'},
-  {id:'u6',nombre:'Diego Navarro',email:'diego.navarro@digitaliza.es',rol:'comercial',desk:'leads',activo:false,iniciales:'DN'}
-];
+/* Los usuarios ya no son fijos: se cargan del servidor tras iniciar sesión (v1.4.0). */
+const USERS=[];
 const DB={
   users:USERS,
   leads:[],
@@ -640,44 +643,106 @@ function deskOf(u){if(u.rol==='admin')return 'admin';if(u.rol==='soporte')return
 
 /* ---------- login ---------- */
 function viewLogin(){
-  const roles=[
-    {u:'u1',t:'Entrar como Administrador',d:'Acceso total: usuarios, búsquedas, informes y configuración.',ic:'shield'},
-    {u:'u2',t:'Entrar como Supervisor',d:'Desk Leads en modo lectura de equipo: rendimiento y reasignación.',ic:'users'},
-    {u:'u3',t:'Entrar como Comercial (Lucía)',d:'Trabaja sus leads asignados, genera demos y cambia estados.',ic:'target'},
-    {u:'u5',t:'Entrar como Soporte técnico',d:'Desk Clientes: tickets, mejoras, renovaciones y onboarding.',ic:'briefcase'}
-  ];
+  let last='';try{last=localStorage.getItem('od.lastEmail')||'';}catch(e){}
   return '<div class="login">'+
     '<div class="login-side"><div class="glow"></div>'+
-      '<div class="brand" style="padding:0"><span class="logo">D</span><span><span class="bname" style="color:#fff">Digitaliza CRM</span><br><span class="bsub">Multi-desk · Captación y postventa</span></span></div>'+
+      '<div class="brand" style="padding:0"><span class="logo">U</span><span><span class="bname" style="color:#fff">UTOP-IA</span><br><span class="bsub">Área de empleados</span></span></div>'+
       '<div style="position:relative">'+
-        '<h1>De negocio invisible a cliente digital.</h1>'+
-        '<p>Un único flujo: encuentra negocios sin web, conviértelos en leads, genera su demo y gestiona la postventa. Dos desks, un sistema.</p>'+
+        '<div class="tiny mono" style="color:#9FB0DA;letter-spacing:.08em;margin-bottom:14px">ACCESO PRIVADO</div>'+
+        '<h1>El panel de trabajo del equipo UTOP-IA.</h1>'+
+        '<p>Inicia sesión con tu cuenta de empleado para acceder a tu desk.</p>'+
         '<div class="login-feats mt24">'+
-          '<div class="login-feat"><span class="dot">'+icon('search','sm')+'</span> Motor de búsqueda con jobs y deduplicación por place_id</div>'+
-          '<div class="login-feat"><span class="dot">'+icon('kanban','sm')+'</span> Pipeline de 9 estados con reglas de negocio reales</div>'+
-          '<div class="login-feat"><span class="dot">'+icon('sparkles','sm')+'</span> Generador de demos web y mini-CRM por sector</div>'+
-          '<div class="login-feat"><span class="dot">'+icon('layers','sm')+'</span> Traspaso automático Lead → Cliente con historial</div>'+
+          '<div class="login-feat"><span class="dot">'+icon('target','sm')+'</span> Tus leads asignados y tu agenda de llamadas</div>'+
+          '<div class="login-feat"><span class="dot">'+icon('sparkles','sm')+'</span> Demos de web y CRM para cada cliente</div>'+
+          '<div class="login-feat"><span class="dot">'+icon('briefcase','sm')+'</span> Clientes, tickets y postventa</div>'+
         '</div>'+
       '</div>'+
-      '<div class="tiny" style="color:#7C879A">Prototipo Fase 1 (MVP) · versión '+esc(APP_VERSION)+' ('+esc(APP_RELEASE)+') · Solo datos reales · RGPD / Lista Robinson reflejados en la interfaz</div>'+
+      '<div class="tiny" style="color:#8C9BC4">UTOP-IA CRM · versión '+esc(APP_VERSION)+' · Uso exclusivo del personal autorizado</div>'+
     '</div>'+
     '<div class="login-panel"><div class="login-card">'+
-      '<h2>Inicia sesión</h2>'+
-      '<p class="muted" style="margin:6px 0 18px">Selecciona un perfil de demostración para ver cómo cambia la interfaz y los permisos por rol.</p>'+
-      '<div class="role-list">'+roles.map(r=>'<button class="role-btn" data-login="'+r.u+'"><span class="ric">'+icon(r.ic)+'</span><span><span class="rname">'+r.t+'</span><br><span class="rdesc">'+r.d+'</span></span>'+icon('chevron','sm')+'</button>').join('')+'</div>'+
-      '<div class="notice mt16">'+icon('info','sm')+'<span>Cada rol aterriza en su desk y solo ve lo que le corresponde. El comercial nunca ve el desk de Clientes.</span></div>'+
+      '<div class="lg-mobile-brand"><span class="logo">U</span><b>UTOP-IA</b><span class="muted small">· Área de empleados</span></div>'+
+      '<h2>Iniciar sesión</h2>'+
+      '<p class="muted" style="margin:6px 0 20px">Usa el email y la contraseña que te ha dado el administrador.</p>'+
+      '<form id="loginForm" novalidate>'+
+        field('Email de empleado','<input class="input" id="lgEmail" type="email" autocomplete="username" value="'+esc(last)+'" required>')+
+        field('Contraseña','<div class="pw-wrap"><input class="input" id="lgPass" type="password" autocomplete="current-password" required><button class="pw-eye" type="button" id="lgEye" aria-label="Mostrar contraseña">Mostrar</button></div>')+
+        '<label class="chk" style="margin:2px 0 6px"><input type="checkbox" id="lgRemember" '+(last?'checked':'')+'> Recordar mi email en este dispositivo</label>'+
+        '<p class="small" id="lgErr" role="alert" style="color:var(--danger);min-height:1.4em;margin:4px 0 8px"></p>'+
+        '<button class="btn primary" id="lgBtn" type="submit" style="width:100%;height:46px;justify-content:center">Entrar</button>'+
+      '</form>'+
+      '<div class="lg-help">¿Has olvidado tu contraseña? Pide al administrador que te asigne una nueva desde <b>Usuarios y roles</b>. Después podrás cambiarla en <b>Mi cuenta</b>.</div>'+
+      (apiBase()?'':'<div class="notice mt16">'+icon('info','sm')+'<span>Abre el CRM desde la dirección del servidor para poder iniciar sesión.</span></div>')+
+      '<div class="lg-secure">'+icon('shield','sm')+'<span>Conexión cifrada · La sesión caduca automáticamente</span></div>'+
     '</div></div>'+
   '</div>';
 }
-function mountLogin(){
-  $$('[data-login]').forEach(b=>b.addEventListener('click',()=>{
-    const u=DB.users.find(x=>x.id===b.getAttribute('data-login'));
-    S.user=u;S.aiMsgs=[];
+function mapServerUser(u){
+  const nombre=u.nombre||u.email||'Usuario';
+  return {id:u.id,nombre:nombre,email:u.email||'',rol:u.rol,desk:u.desk||(u.rol==='soporte'?'clientes':u.rol==='admin'?'todos':'leads'),activo:u.activo!==false,
+    iniciales:nombre.split(/\s+/).filter(Boolean).map(function(w){return w[0];}).join('').slice(0,2).toUpperCase(),created_at:u.created_at||null};
+}
+function loadUsers(){
+  const base=apiBase();if(!base||!backendLogged())return Promise.resolve();
+  return fetchJsonTimeout(base+'/api/users',{headers:apiHeaders(false)},12000).then(function(r){
+    if(apiAuthFailed(r.res))return;
+    if(r.res.ok&&r.j&&Array.isArray(r.j.users)){
+      DB.users.length=0;r.j.users.forEach(function(u){DB.users.push(mapServerUser(u));});
+      if(S.user){const me=DB.users.find(function(x){return x.id===S.user.id;});if(me){S.user=me;}}
+    }
+  }).catch(function(){});
+}
+function enterAs(u){
+  S.user=mapServerUser(u);S.aiMsgs=[];
+  if(!DB.users.find(function(x){return x.id===S.user.id;}))DB.users.push(S.user);
+  return loadUsers().then(function(){
     if(typeof syncReady==='function'&&backendConfigured()&&backendLogged()){startSyncLoop();setTimeout(syncNow,300);}
-    const land=u.rol==='admin'?'#/admin':u.rol==='soporte'?'#/clients':'#/leads/dashboard';
-    go(land);render();
-    toast('Bienvenido/a, '+u.nombre.split(' ')[0],'ok');
-  }));
+    if(!location.hash||location.hash==='#/login'){go(S.user.rol==='admin'?'#/admin':S.user.rol==='soporte'?'#/clients':'#/leads/dashboard');}
+    render();
+  });
+}
+function mountLogin(){
+  const f=$('#loginForm');if(!f)return;
+  const em=$('#lgEmail');if(em){if(em.value){const pp=$('#lgPass');if(pp)pp.focus();}else em.focus();}
+  const eye=$('#lgEye');if(eye)eye.addEventListener('click',function(){const pp=$('#lgPass');const show=pp.type==='password';pp.type=show?'text':'password';eye.textContent=show?'Ocultar':'Mostrar';eye.setAttribute('aria-label',show?'Ocultar contraseña':'Mostrar contraseña');});
+  f.addEventListener('submit',function(e){
+    e.preventDefault();
+    const base=apiBase(),err=$('#lgErr'),btn=$('#lgBtn');
+    const email=$('#lgEmail').value.trim(),password=$('#lgPass').value;
+    if(!base){err.textContent='No hay servidor configurado.';return;}
+    if(!email||!password){err.textContent='Escribe tu email y tu contraseña.';return;}
+    btn.disabled=true;btn.textContent='Entrando…';err.textContent='';
+    fetchJsonTimeout(base+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,password:password})},12000).then(function(r){
+      const j=r.j||{};
+      if(!r.res.ok||!j.token){err.textContent=j.error||('No se pudo iniciar sesión (HTTP '+r.res.status+')');btn.disabled=false;btn.textContent='Entrar';return;}
+      const st=settings();st.apiToken=j.token;st.apiTokenExp=j.expires_at||'';st.apiUser=j.user||null;persistSettings();
+      try{if($('#lgRemember')&&$('#lgRemember').checked)localStorage.setItem('od.lastEmail',email);else localStorage.removeItem('od.lastEmail');}catch(_e){}
+      enterAs(j.user).then(function(){toast('Bienvenido/a, '+String(S.user.nombre).split(' ')[0],'ok');});
+    }).catch(function(e){err.textContent='No se pudo contactar con el servidor: '+(e&&e.name==='AbortError'?'tiempo de espera agotado':(e&&e.message));btn.disabled=false;btn.textContent='Entrar';});
+  });
+}
+function restoreSession(){
+  const base=apiBase();if(!base||!backendLogged())return;
+  fetchJsonTimeout(base+'/api/auth/me',{headers:apiHeaders(false)},12000).then(function(r){
+    if(apiAuthFailed(r.res)){render();return;}
+    if(r.res.ok&&r.j&&r.j.user){const want=location.hash;enterAs(r.j.user).then(function(){if(want&&want!=='#/login'){go(want);render();}});}
+  }).catch(function(){});
+}
+function openAccountModal(){
+  modal({title:'Mi cuenta',body:
+    '<p class="small muted" style="margin-top:0">'+esc(S.user.nombre)+' · '+esc(S.user.email||'')+' · '+ROL_LABEL[S.user.rol]+'</p>'+
+    field('Contraseña actual','<input class="input" id="acOld" type="password" autocomplete="current-password">')+
+    field('Nueva contraseña','<input class="input" id="acNew" type="password" autocomplete="new-password">','Mínimo 10 caracteres.')+
+    '<p class="small" id="acErr" style="color:var(--danger);min-height:1.4em"></p>',
+    footer:'<button class="btn" data-close="1">Cancelar</button><button class="btn primary" id="acSave">'+icon('check','sm')+' Cambiar contraseña</button>',
+    onMount(root){$('#acSave',root).onclick=function(){
+      const nueva=$('#acNew',root).value,err=$('#acErr',root);
+      if(nueva.length<10){err.textContent='La nueva contraseña debe tener al menos 10 caracteres.';return;}
+      fetchJsonTimeout(apiBase()+'/api/auth/password',{method:'POST',headers:apiHeaders(),body:JSON.stringify({actual:$('#acOld',root).value,nueva:nueva})},12000).then(function(r){
+        if(apiAuthFailed(r.res))return;
+        if(!r.res.ok){err.textContent=(r.j&&r.j.error)||('Error HTTP '+r.res.status);return;}
+        toast('Contraseña cambiada','ok');closeModal();
+      }).catch(function(e){err.textContent='Sin conexión con el servidor: '+(e&&e.message);});
+    };}});
 }
 
 /* ---------- shell ---------- */
@@ -729,12 +794,12 @@ function viewShell(){
         (it.h==='#/leads'&&newLeads?'<span class="count">'+newLeads+'</span>':'')+'</a>';
     }).join('')+'</div>').join('');
   return '<div class="shell">'+
-    '<aside class="sidebar"><div class="brand"><span class="logo">D</span><span><span class="bname">Digitaliza CRM</span><br><span class="bsub">'+esc(deskName(S.user))+'</span></span></div>'+
+    '<aside class="sidebar"><div class="brand"><span class="logo">U</span><span><span class="bname">UTOP-IA <span style="font-weight:400;opacity:.7">CRM</span></span><br><span class="bsub">'+esc(deskName(S.user))+'</span></span></div>'+
       '<nav class="nav">'+groups+'</nav>'+
       '<div class="side-foot">'+
         '<div class="row gap8" style="padding:6px 8px"><span class="avatar lg" style="background:rgba(255,255,255,.08);color:#fff;border-color:transparent">'+esc(S.user.iniciales)+'</span>'+
           '<span class="fill"><span style="color:#fff;font-weight:600;font-size:13.5px;display:block">'+esc(S.user.nombre)+'</span><span class="tiny" style="color:#7C879A">'+ROL_LABEL[S.user.rol]+'</span></span>'+
-          '<button class="iconbtn" id="logout" title="Salir" style="color:#9AA5B4">'+icon('logout','sm')+'</button></div>'+
+          '<button class="iconbtn" id="myAccount" title="Mi cuenta" style="color:#9AA5B4">'+icon('shield','sm')+'</button><button class="iconbtn" id="logout" title="Salir" style="color:#9AA5B4">'+icon('logout','sm')+'</button></div>'+
         '<div class="row" style="padding:8px 8px 2px;display:flex;justify-content:space-between;align-items:center"><span class="tiny mono" style="color:#6B7688">versión '+esc(APP_VERSION)+'</span><span class="tiny" style="color:#6B7688">'+esc(APP_RELEASE)+'</span></div>'+
         '<div class="tiny" id="saveState" style="color:#6B7688;padding:0 8px 4px">Guardado local</div>'+
       '</div>'+
@@ -789,14 +854,15 @@ function viewRoute(){
   if(r==='#/clients/kb')return '<div class="content">'+viewKB()+'</div>';
   if(r.indexOf('#/clients/')===0&&r!=='#/clients/tickets'&&r!=='#/clients/renovaciones'&&r!=='#/clients/kb')return '<div class="content">'+viewClientDetail(id)+'</div>';
   if(r==='#/admin')return '<div class="content">'+viewAdminReports()+'</div>';
-  if(r==='#/admin/users')return '<div class="content">'+viewAdminUsers()+'</div>';
+  if(r==='#/admin/users'){if(!S._usersLoadedAt||Date.now()-S._usersLoadedAt>15000){S._usersLoadedAt=Date.now();loadUsers().then(function(){if(S.route==='#/admin/users')render();});}return '<div class="content">'+viewAdminUsers()+'</div>';}
   if(r==='#/admin/searches')return '<div class="content">'+viewAdminSearches()+'</div>';
   if(r==='#/admin/settings')return '<div class="content">'+viewAdminSettings()+'</div>';
   return '<div class="content"><div class="empty">'+icon('compass','lg')+'<p>Sección no encontrada.</p></div></div>';
 }
 function mountShell(){
   $$('[data-nav]').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();document.body.classList.remove('nav-open');cancelJob();go(a.getAttribute('href'));}));
-  const lo=$('#logout');if(lo)lo.addEventListener('click',()=>{cancelJob();S.user=null;S.aiOpen=false;S.aiMsgs=[];go('#/login');render();});
+  const lo=$('#logout');if(lo)lo.addEventListener('click',()=>{cancelJob();const st=settings();st.apiToken='';st.apiUser=null;st.apiTokenExp='';persistSettings();if(typeof stopSyncLoop==='function')stopSyncLoop();S.user=null;S.aiOpen=false;S.aiMsgs=[];DB.users.length=0;go('#/login');render();});
+  const ac=$('#myAccount');if(ac)ac.addEventListener('click',openAccountModal);
   const tg=$('#navToggle');if(tg){tg.style.display=window.innerWidth<=960?'inline-flex':'none';tg.addEventListener('click',()=>document.body.classList.toggle('nav-open'));}
   const ai=$('#openAI');if(ai)ai.addEventListener('click',()=>{S.aiOpen=true;mountAI();});
   const gs=$('#globalSearch');if(gs)gs.addEventListener('input',e=>{S.listQuery=e.target.value;if(S.route==='#/leads')clearLeadSel();if(S.route!=='#/leads'&&S.route!=='#/clients'){location.hash='#/leads';}else{render();const ns=$('#globalSearch');if(ns){ns.focus();ns.setSelectionRange(ns.value.length,ns.value.length);}}});
@@ -1305,11 +1371,16 @@ function viewAdminReports(){
 }
 function stColor(e){const map={nuevo:'#2F5DD9',no_contesta:'#8B95A4',callback:'#C2680A',presentado:'#6D3BD1',potencial:'#0F8B7E',no_interes:'#C4271F',numero_erroneo:'#A2560A',descartado:'#66707F',convertido:'#15803D'};return map[e]||'var(--accent)';}
 function viewAdminUsers(){
-  return '<div class="page-head"><div><h1>Usuarios y roles</h1><div class="page-sub">'+DB.users.length+' usuarios · control de acceso por rol (RBAC)</div></div><button class="btn primary" id="newUser">'+icon('plus','sm')+' Invitar usuario</button></div>'+
+  const admin=S.user&&S.user.rol==='admin';
+  const online=backendConfigured()&&backendLogged();
+  return '<div class="page-head"><div><h1>Usuarios y roles</h1><div class="page-sub">'+DB.users.length+' usuarios · gestionados en el servidor</div></div>'+
+    (admin?'<button class="btn primary" id="newUser">'+icon('plus','sm')+' Añadir empleado</button>':'')+'</div>'+
+  (online?'':'<div class="notice mb16">'+icon('info','sm')+'<span>Sin conexión con el servidor: la lista no se puede modificar ahora.</span></div>')+
   '<div class="card tbl-wrap"><table class="table"><thead><tr><th>Usuario</th><th>Email</th><th>Rol</th><th>Desk</th><th>Estado</th><th>Leads</th><th></th></tr></thead><tbody>'+
-    DB.users.map(u=>'<tr><td class="row gap8">'+av(u)+'<span class="strong">'+esc(u.nombre)+'</span></td><td class="small mono">'+esc(u.email)+'</td><td><span class="badge" style="background:var(--accent-tint);color:var(--accent)">'+ROL_LABEL[u.rol]+'</span></td><td class="small">'+(u.desk==='leads'?'Desk Leads':u.desk==='clientes'?'Desk Clientes':'Todos')+'</td><td>'+(u.activo?'<span class="badge" style="background:var(--ok-tint);color:var(--ok)">Activo</span>':'<span class="badge">Inactivo</span>')+'</td><td class="mono tiny">'+DB.leads.filter(l=>l.asignado_a===u.id).length+'</td><td class="right"><button class="iconbtn" data-edituser="'+u.id+'">'+icon('edit','sm')+'</button></td></tr>').join('')+
+    (DB.users.length?DB.users.map(u=>'<tr><td class="row gap8">'+av(u)+'<span class="strong">'+esc(u.nombre)+(S.user&&u.id===S.user.id?' <span class="tiny muted">(tú)</span>':'')+'</span></td><td class="small mono">'+esc(u.email||'')+'</td><td><span class="badge" style="background:var(--accent-tint);color:var(--accent)">'+(ROL_LABEL[u.rol]||u.rol)+'</span></td><td class="small">'+(u.desk==='leads'?'Desk Leads':u.desk==='clientes'?'Desk Clientes':'Todos')+'</td><td>'+(u.activo?'<span class="badge" style="background:var(--ok-tint);color:var(--ok)">Activo</span>':'<span class="badge">Inactivo</span>')+'</td><td class="mono tiny">'+DB.leads.filter(l=>l.asignado_a===u.id).length+'</td><td class="right">'+
+      (admin?'<button class="iconbtn" data-edituser="'+u.id+'" title="Editar">'+icon('edit','sm')+'</button>'+(u.id!==S.user.id?'<button class="iconbtn" data-deluser="'+u.id+'" title="Borrar" style="color:var(--danger)">'+icon('trash','sm')+'</button>':''):'')+'</td></tr>').join(''):'<tr><td colspan="7" class="muted small">Cargando usuarios…</td></tr>')+
   '</tbody></table></div>'+
-  '<div class="card mt16"><div class="card-head"><h3>Matriz de permisos por desk</h3></div><div class="tbl-wrap"><table class="table"><thead><tr><th>Rol</th><th>Desk Leads</th><th>Desk Clientes</th><th>Admin</th><th>Reasignar</th><th>Exportar</th></tr></thead><tbody>'+
+  '<div class="card mt16"><div class="card-head"><h3>Permisos por rol</h3></div><div class="tbl-wrap"><table class="table"><thead><tr><th>Rol</th><th>Desk Leads</th><th>Desk Clientes</th><th>Admin</th><th>Reasignar</th><th>Exportar</th></tr></thead><tbody>'+
     [['Admin','Total','Total','Sí','Sí','Sí'],['Supervisor','Lectura equipo','—','Básico','Sí','Sí'],['Comercial','Solo sus leads','—','—','—','—'],['Soporte','—','Total','—','—','Sí']].map(r=>'<tr><td class="strong">'+r[0]+'</td>'+r.slice(1).map(c=>'<td class="small" style="color:'+(c==='—'?'var(--muted-2)':'var(--ink-2)')+'">'+c+'</td>').join('')+'</tr>').join('')+
   '</tbody></table></div></div>';
 }
@@ -1396,7 +1467,7 @@ function spainCells(p){
 }
 function apifySettings(){return settings();}
 function apifyConfigured(){const t=apifySettings().apifyToken;return !!(t&&String(t).trim());}
-function apiBase(){const b=settings().apiBase;return (b&&String(b).trim())?String(b).trim().replace(/\/+$/,''):'';}
+function apiBase(){const b=settings().apiBase;if(b&&String(b).trim())return String(b).trim().replace(/\/+$/,'');return /^https?:$/.test(location.protocol)?location.origin:'';}
 function backendConfigured(){return !!apiBase();}
 /* Sesión del backend (v1.2.0): todas las llamadas a /api llevan el token. */
 function apiToken(){const s=settings();if(!s.apiToken)return '';if(s.apiTokenExp&&new Date(s.apiTokenExp).getTime()<Date.now())return '';return s.apiToken;}
@@ -1619,7 +1690,7 @@ document.addEventListener('visibilitychange',function(){if(document.visibilitySt
 function exportBackup(){
   persistDB();
   const blob=new Blob([JSON.stringify(dbPayload(),null,2)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='digitaliza-crm-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='utopia-crm-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();
   setTimeout(function(){URL.revokeObjectURL(a.href);},1000);
   toast('Copia de seguridad descargada','ok');
 }
@@ -2045,7 +2116,7 @@ function loadDatasetFile(input){
 function bindDelegates(){
   document.addEventListener('click',function(e){
     if(e.target.closest('[data-select],#selAll'))return;
-    const t=e.target.closest('[data-go],[data-filter],[data-webfilter],[data-bulkassign],[data-tab],[data-estado],[data-call],[data-demo],[data-send],[data-addnote],[data-ticket],[data-edituser],[data-tfilter],[data-newticket],[data-toggle-nocontact],[data-reassign],[data-next],[data-score],[data-newarticle],[data-kbview],[data-source],[data-webhooktest],[data-notif],[data-demoopen],[data-web],[data-copyprompt],[data-del-lead],[data-del-search],[data-undo-search],[data-sort],#lfDir,#lfClear,#exportLeads,#exportClients,#runSearch,#resetSearch,#quickSearch,#importDataset,#newUser,#apifySave,#apifyClear,#apifyTest,#apiSave,#apiClear,#apiLogin,#apiLogout,#syncNow,#aiSave,#aiClear,#dbExport,#dbImportBtn,#bulkAssign,#bulkStatus,#bulkNoContact,#bulkExport,#bulkDelete,#bulkClear,#selectAllBtn,#undoLastSearch,#clearSearchHistory');
+    const t=e.target.closest('[data-go],[data-filter],[data-webfilter],[data-bulkassign],[data-tab],[data-estado],[data-call],[data-demo],[data-send],[data-addnote],[data-ticket],[data-edituser],[data-deluser],[data-tfilter],[data-newticket],[data-toggle-nocontact],[data-reassign],[data-next],[data-score],[data-newarticle],[data-kbview],[data-source],[data-webhooktest],[data-notif],[data-demoopen],[data-web],[data-copyprompt],[data-del-lead],[data-del-search],[data-undo-search],[data-sort],#lfDir,#lfClear,#exportLeads,#exportClients,#runSearch,#resetSearch,#quickSearch,#importDataset,#newUser,#apifySave,#apifyClear,#apifyTest,#apiSave,#apiClear,#apiLogin,#apiLogout,#syncNow,#aiSave,#aiClear,#dbExport,#dbImportBtn,#bulkAssign,#bulkStatus,#bulkNoContact,#bulkExport,#bulkDelete,#bulkClear,#selectAllBtn,#undoLastSearch,#clearSearchHistory');
     if(!t)return;
     if(t.hasAttribute('data-go')){go(t.getAttribute('data-go'));return;}
     if(t.hasAttribute('data-sort')){const v=leadView();const k=t.getAttribute('data-sort');if(v.sort===k)v.dir=v.dir==='asc'?'desc':'asc';else{v.sort=k;v.dir=(['nombre','sector','ciudad','asignado','proxima','estado'].indexOf(k)>=0)?'asc':'desc';}saveLeadView();render();return;}
@@ -2092,6 +2163,7 @@ function bindDelegates(){
     if(t.id==='exportClients'){exportCSV('clientes');return;}
     if(t.id==='newUser'){openUserModal();return;}
     if(t.hasAttribute('data-edituser')){openUserModal(t.getAttribute('data-edituser'));return;}
+    if(t.hasAttribute('data-deluser')){openDeleteUserModal(t.getAttribute('data-deluser'));return;}
     if(t.hasAttribute('data-estado')){openEstadoModal(t.getAttribute('data-estado'));return;}
     if(t.hasAttribute('data-call')){openCallModal(t.getAttribute('data-call'));return;}
     if(t.hasAttribute('data-demo')){openDemoModal(t.getAttribute('data-demo'));return;}
@@ -2158,7 +2230,7 @@ function exportCSV(kind,subset){
     csv=[['id','nombre','plan','precio','alta','renovacion','estado']].concat(rows.map(c=>[c.id,c.nombre,c.plan,c.precio,fmtDate(c.fecha_alta),fmtDate(c.renovacion),c.estado])).map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
   }
   const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='digitaliza-'+kind+'.csv';a.click();
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='utopia-'+kind+'.csv';a.click();
   audits(kind,'export',null,{filas:rows.length});
   toast(kind==='leads'?(rows.length+' leads exportados a CSV'):'Exportación CSV generada','ok');
 }
@@ -2237,12 +2309,12 @@ function legacyDemoModal(id){
     '<p class="muted small" style="margin-top:0">Se crea una demo a partir de los datos y fotos de la ficha. Caduca automáticamente y cuenta visitas.</p>'+
     field('Tipo de demo','<select class="select" id="demoTipo"><option value="web">Web de prueba</option><option value="crm">Mini-CRM (agenda, clientes, citas)</option></select>')+
     field('Plantilla sectorial','<input class="input" value="'+esc(sectorMeta(l.sector).plantilla)+'" readonly>')+
-    '<div class="notice">'+icon('external','sm')+'<span class="small mono">demo.digitaliza.es/'+esc(l.nombre.toLowerCase().replace(/[^a-z0-9]+/g,'-'))+'</span></div>'+
+    '<div class="notice">'+icon('external','sm')+'<span class="small mono">/demo/'+esc(l.nombre.toLowerCase().replace(/[^a-z0-9]+/g,'-'))+'</span></div>'+
     '<p class="tiny muted mt8">La demo caduca en 14 días. Al convertir el lead se promueve a proyecto real.</p>',
     footer:'<button class="btn" data-close="1">Cancelar</button><button class="btn primary" id="demoSave">'+icon('sparkles','sm')+' Generar demo</button>',
     onMount(root){$('#demoSave',root).onclick=()=>{
       const tipo=$('#demoTipo',root).value;
-      const d={id:uid('d'),tipo,url:'https://demo.digitaliza.es/'+l.nombre.toLowerCase().replace(/[^a-z0-9]+/g,'-'),estado:'generada',caduca_en:todayShift(14),visitas:0,enviada_en:null};
+      const d={id:uid('d'),tipo,url:location.origin+'/demo/'+l.nombre.toLowerCase().replace(/[^a-z0-9]+/g,'-'),estado:'generada',caduca_en:todayShift(14),visitas:0,enviada_en:null};
       l.demos.push(d);
       l.interactions.push({id:uid('i'),user_id:S.user.id,tipo:'nota',resultado:null,nota:'Demo '+(tipo==='web'?'web':'mini-CRM')+' generada ('+d.url+').',fecha:new Date().toISOString()});
       audits('demos','create',null,{lead:id,tipo});
@@ -2321,7 +2393,7 @@ function buildLeadPrompt(l,extra){
     '- Español de España, tono cercano y profesional.',
     '- Mobile first y contraste AA.',
     '- Si falta un dato, [POR CONFIRMAR]; nunca rellenes con ficción.',
-    '- La demo es una propuesta comercial de Digitaliza CRM y debe incluir un aviso discreto de demo.'
+    '- La demo es una propuesta comercial de UTOP-IA y debe incluir un aviso discreto de demo.'
   ].join('\n');
 }
 const LANDING_STYLES={
@@ -2397,8 +2469,8 @@ function buildLanding(l,img,opts){
   '<section class="section"><div class="wrap"><div class="head"><div class="eyebrow">Preguntas frecuentes</div><h2>Antes de venir</h2></div>'+faqs+'</div></section>'+
   '<section class="section" id="contacto" style="background:color-mix(in srgb,var(--card) 55%,var(--bg))"><div class="wrap"><div class="head"><div class="eyebrow">Contacto</div><h2>Hablemos</h2><p class="sub">Estamos en '+esc(l.direccion||'tu zona')+', '+esc(l.ciudad||'')+'.</p></div><div class="contact"><div class="box"><div class="row"><b>Teléfono</b><span style="margin-left:auto"><a href="'+esc(tel)+'">'+esc(phone)+'</a></span></div><div class="row"><b>WhatsApp</b><span style="margin-left:auto"><a href="'+esc(wa)+'" target="_blank" rel="noopener">Escribir ahora</a></span></div><div class="row"><b>Horario</b><span style="margin-left:auto">'+esc(l.horario||'Consulta disponibilidad')+'</span></div><div class="row"><b>Email</b><span style="margin-left:auto">'+esc(l.email||'[POR CONFIRMAR]')+'</span></div></div>'+
     '<div class="box" style="display:flex;flex-direction:column;justify-content:center;gap:14px"><h3 style="margin:0">¿Pedimos cita?</h3><p class="sub">La forma más rápida es llamar o escribir por WhatsApp. Te confirmamos disponibilidad al momento.</p><div class="cta" style="display:flex;gap:10px;flex-wrap:wrap"><a class="btn primary" href="'+esc(tel)+'">Llamar</a><a class="btn ghost" href="'+esc(wa)+'" target="_blank" rel="noopener">WhatsApp</a></div></div></div></div></section>'+
-  '<footer class="foot"><div class="wrap"><span>© '+new Date().getFullYear()+' '+esc(l.nombre)+' · '+esc(l.ciudad||'')+'</span><span>Demo creada por Digitaliza CRM</span></div></footer>'+
-  '<div class="demoflag">DEMO · Digitaliza CRM</div><a class="wa" href="'+esc(wa)+'" target="_blank" rel="noopener" aria-label="WhatsApp"><svg viewBox="0 0 32 32"><path d="M16 3a13 13 0 0 0-11 20l-2 7 7-2A13 13 0 1 0 16 3zm0 2.4a10.6 10.6 0 0 1 8.9 16.4l-.4.6.7 2.6-2.7-.7-.6.3A10.6 10.6 0 1 1 16 5.4zm-4.1 5c-.2 0-.5 0-.7.3-.3.3-.9.9-.9 2.1s.9 2.4 1 2.6c.1.2 1.8 2.9 4.5 4 2.2.9 2.7.7 3.2.7.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2-.1-.1-.2-.2-.5-.3l-1.7-.8c-.2-.1-.4-.1-.5.1l-.7.9c-.1.2-.3.2-.5.1-.2-.1-1-.4-1.9-1.2-.7-.6-1.2-1.4-1.3-1.6-.1-.2 0-.3.1-.4l.4-.5c.1-.2.2-.3.3-.5.1-.2 0-.3 0-.5l-.7-1.7c-.2-.4-.4-.4-.6-.4z"/></svg></a>'+
+  '<footer class="foot"><div class="wrap"><span>© '+new Date().getFullYear()+' '+esc(l.nombre)+' · '+esc(l.ciudad||'')+'</span><span>Demo creada por UTOP-IA</span></div></footer>'+
+  '<div class="demoflag">DEMO · UTOP-IA</div><a class="wa" href="'+esc(wa)+'" target="_blank" rel="noopener" aria-label="WhatsApp"><svg viewBox="0 0 32 32"><path d="M16 3a13 13 0 0 0-11 20l-2 7 7-2A13 13 0 1 0 16 3zm0 2.4a10.6 10.6 0 0 1 8.9 16.4l-.4.6.7 2.6-2.7-.7-.6.3A10.6 10.6 0 1 1 16 5.4zm-4.1 5c-.2 0-.5 0-.7.3-.3.3-.9.9-.9 2.1s.9 2.4 1 2.6c.1.2 1.8 2.9 4.5 4 2.2.9 2.7.7 3.2.7.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2-.1-.1-.2-.2-.5-.3l-1.7-.8c-.2-.1-.4-.1-.5.1l-.7.9c-.1.2-.3.2-.5.1-.2-.1-1-.4-1.9-1.2-.7-.6-1.2-1.4-1.3-1.6-.1-.2 0-.3.1-.4l.4-.5c.1-.2.2-.3.3-.5.1-.2 0-.3 0-.5l-.7-1.7c-.2-.4-.4-.4-.6-.4z"/></svg></a>'+
   '<script type="application/ld+json">'+ldJson+'<\/script>'+
   '</body></html>';
 }
@@ -2429,7 +2501,7 @@ function buildMiniCRM(l,img){
     '<div class="card"><h3>Agenda de hoy</h3><table>'+citas.map(c=>'<tr><td class="h">'+c.h+'</td><td>'+esc(c.t)+'</td><td><span class="b">Confirmada</span></td></tr>').join('')+'</table><div class="note">Reprograma arrastrando y envía recordatorios automáticos por WhatsApp.</div></div>'+
     '<div class="card"><h3>Acciones rápidas</h3>'+['Nueva cita','Alta de cliente','Enviar recordatorio','Registrar pago','Ver informes'].map(x=>'<div class="row"><span class="dot"></span>'+esc(x)+'</div>').join('')+'<div class="note">Plantilla sectorial: '+esc((SECTOR_META[l.sector]||{}).plantilla||'General')+'.</div></div>'+
   '</div></div>'+
-  '<div class="foot">Mini-CRM de demostración generado por Digitaliza CRM para '+esc(l.nombre)+'.</div>'+
+  '<div class="foot">Mini-CRM de demostración generado por UTOP-IA para '+esc(l.nombre)+'.</div>'+
   '</body></html>';
 }
 function webSlug(l){return String(l.nombre||'demo').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'demo';}
@@ -2550,7 +2622,7 @@ function legacyLeadWebModal(id, active){
         l.web_prompt=currentPrompt();l.web_research=research;l.web_style=style;l.web_ai_copy=aiCopy||null;
         const existing=l.demos.find(function(d){return d.tipo==='web';});
         if(existing){existing.estilo=style;existing.estado='generada';existing.generada_en=new Date().toISOString();}
-        else{l.demos.push({id:uid('d'),tipo:'web',url:'https://demo.digitaliza.es/'+slug,estado:'generada',caduca_en:todayShift(14),visitas:0,enviada_en:null,estilo:style,generada_en:new Date().toISOString()});audits('demos','create',null,{lead:id,tipo:'web',estilo:style});}
+        else{l.demos.push({id:uid('d'),tipo:'web',url:location.origin+'/demo/'+slug,estado:'generada',caduca_en:todayShift(14),visitas:0,enviada_en:null,estilo:style,generada_en:new Date().toISOString()});audits('demos','create',null,{lead:id,tipo:'web',estilo:style});}
         l.interactions.push({id:uid('i'),user_id:S.user.id,tipo:'nota',resultado:null,nota:'Estudio web generado (estilo '+style+').',fecha:new Date().toISOString()});
         persistDB();closeModal();render();toast('Demo guardada en la ficha','ok');
       }
@@ -2614,26 +2686,68 @@ function openTicketModal(tid,presetCustomer){
 }
 
 /* --- usuario modal --- */
+function genPassword(){const c='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';let o='';const a=new Uint32Array(14);(window.crypto||window.msCrypto).getRandomValues(a);for(let i=0;i<a.length;i++)o+=c[a[i]%c.length];return o;}
+function userApi(method,path,body){
+  return fetchJsonTimeout(apiBase()+path,{method:method,headers:apiHeaders(body!==undefined),body:body!==undefined?JSON.stringify(body):undefined},15000).then(function(r){
+    if(apiAuthFailed(r.res))throw new Error('Sesión caducada');
+    if(!r.res.ok)throw new Error((r.j&&r.j.error)||('HTTP '+r.res.status));
+    return r.j||{};
+  });
+}
 function openUserModal(uidv){
   const u=uidv?DB.users.find(x=>x.id===uidv):null;
-  modal({title:u?'Editar usuario':'Invitar usuario',body:
+  const self=u&&S.user&&u.id===S.user.id;
+  modal({title:u?'Editar empleado':'Añadir empleado',body:
     '<div class="form-grid">'+
-      field('Nombre','<input class="input" id="uName" value="'+esc(u?u.nombre:'')+'">')+
-      field('Email','<input class="input" id="uEmail" value="'+esc(u?u.email:'')+'">')+
+      field('Nombre y apellidos','<input class="input" id="uName" value="'+esc(u?u.nombre:'')+'" autocomplete="off">')+
+      field('Email (usuario de acceso)','<input class="input" id="uEmail" type="email" value="'+esc(u?u.email:'')+'" autocomplete="off">')+
     '</div>'+
     '<div class="form-grid">'+
-      field('Rol','<select class="select" id="uRol">'+Object.keys(ROL_LABEL).map(r=>'<option value="'+r+'" '+(u&&u.rol===r?'selected':'')+'>'+ROL_LABEL[r]+'</option>').join('')+'</select>')+
-      field('Desk','<select class="select" id="uDesk"><option value="leads" '+(u&&u.desk==='leads'?'selected':'')+'>Desk Leads</option><option value="clientes" '+(u&&u.desk==='clientes'?'selected':'')+'>Desk Clientes</option><option value="todos" '+(u&&u.desk==='todos'?'selected':'')+'>Todos</option></select>')+
+      field('Rol','<select class="select" id="uRol" '+(self?'disabled':'')+'>'+Object.keys(ROL_LABEL).map(r=>'<option value="'+r+'" '+((u?u.rol:'comercial')===r?'selected':'')+'>'+ROL_LABEL[r]+'</option>').join('')+'</select>',self?'No puedes quitarte el rol de administrador a ti mismo.':'')+
+      field('Desk','<select class="select" id="uDesk"><option value="leads" '+((u?u.desk:'leads')==='leads'?'selected':'')+'>Desk Leads</option><option value="clientes" '+(u&&u.desk==='clientes'?'selected':'')+'>Desk Clientes</option><option value="todos" '+(u&&u.desk==='todos'?'selected':'')+'>Todos</option></select>')+
     '</div>'+
-    '<label class="chk"><input type="checkbox" id="uActive" '+(u&&u.activo?'checked':'')+'> Usuario activo</label>',
+    field(u?'Nueva contraseña':'Contraseña','<div class="row gap8"><input class="input fill" id="uPass" type="text" autocomplete="new-password" placeholder="'+(u?'Déjala vacía para no cambiarla':'Mínimo 10 caracteres')+'"><button class="btn outline" type="button" id="uGen">Generar</button></div>','Mínimo 10 caracteres. Comunícasela al empleado por un canal seguro; podrá cambiarla desde «Mi cuenta».')+
+    '<label class="chk"><input type="checkbox" id="uActive" '+(!u||u.activo?'checked':'')+' '+(self?'disabled':'')+'> Usuario activo (puede iniciar sesión)</label>'+
+    '<p class="small" id="uErr" style="color:var(--danger);min-height:1.4em"></p>',
     footer:'<button class="btn" data-close="1">Cancelar</button><button class="btn primary" id="uSave">'+icon('check','sm')+' Guardar</button>',
-    onMount(root){$('#uSave',root).onclick=()=>{
-      const name=$('#uName',root).value.trim();if(!name){toast('El usuario necesita nombre','warn');return;}
-      const data={nombre:name,email:$('#uEmail',root).value.trim(),rol:$('#uRol',root).value,desk:$('#uDesk',root).value,activo:$('#uActive',root).checked||!u};
-      if(u)Object.assign(u,data);
-      else DB.users.push(Object.assign({id:uid('u'),iniciales:name.split(' ').map(s=>s[0]).join('').slice(0,2).toUpperCase()},data));
-      audits('users',u?'update':'create',u?u.id:null,data);
-      toast(u?'Usuario actualizado':'Usuario invitado','ok');closeModal();render();
+    onMount(root){
+      $('#uGen',root).onclick=function(){$('#uPass',root).value=genPassword();};
+      $('#uSave',root).onclick=function(){
+        const err=$('#uErr',root),btn=$('#uSave',root);
+        const nombre=$('#uName',root).value.trim(),email=$('#uEmail',root).value.trim().toLowerCase(),pass=$('#uPass',root).value;
+        if(!nombre){err.textContent='Escribe el nombre.';return;}
+        if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){err.textContent='Escribe un email válido.';return;}
+        if((!u&&pass.length<10)||(u&&pass&&pass.length<10)){err.textContent='La contraseña debe tener al menos 10 caracteres.';return;}
+        const body={nombre:nombre,email:email,desk:$('#uDesk',root).value};
+        if(!self){body.rol=$('#uRol',root).value;body.activo=$('#uActive',root).checked;}
+        if(pass)body.password=pass;
+        btn.disabled=true;err.textContent='';
+        (u?userApi('PATCH','/api/users/'+encodeURIComponent(u.id),body):userApi('POST','/api/users',body)).then(function(j){
+          audits('users',u?'update':'create',u?u.id:null,{nombre:nombre,email:email,rol:body.rol||u.rol});
+          return loadUsers().then(function(){toast(u?'Empleado actualizado':'Empleado creado'+(pass?' · recuerda darle su contraseña':''),'ok');closeModal();render();});
+        }).catch(function(e){err.textContent=e.message;btn.disabled=false;});
+      };
+    }});
+}
+function openDeleteUserModal(uidv){
+  const u=DB.users.find(x=>x.id===uidv);if(!u)return;
+  const n=DB.leads.filter(l=>l.asignado_a===u.id).length;
+  const others=DB.users.filter(x=>x.id!==u.id&&x.activo&&(x.rol==='comercial'||x.rol==='supervisor'||x.rol==='admin'));
+  modal({title:'Borrar empleado',body:
+    '<p>Vas a borrar a <b>'+esc(u.nombre)+'</b> ('+esc(u.email)+'). Perderá el acceso al momento. Su historial de llamadas y notas se conserva.</p>'+
+    field('Sus '+n+' leads asignados pasan a','<select class="select" id="dReas"><option value="">Sin asignar</option>'+others.map(x=>'<option value="'+x.id+'">'+esc(x.nombre)+' · '+ROL_LABEL[x.rol]+'</option>').join('')+'</select>')+
+    field('Para confirmar, escribe BORRAR','<input class="input" id="dConf" autocomplete="off">')+
+    '<p class="small" id="dErr" style="color:var(--danger);min-height:1.4em"></p>',
+    footer:'<button class="btn" data-close="1">Cancelar</button><button class="btn danger" id="dGo">'+icon('trash','sm')+' Borrar empleado</button>',
+    onMount(root){$('#dGo',root).onclick=function(){
+      const err=$('#dErr',root);
+      if($('#dConf',root).value.trim().toUpperCase()!=='BORRAR'){err.textContent='Escribe BORRAR para confirmar.';return;}
+      const to=$('#dReas',root).value;
+      userApi('DELETE','/api/users/'+encodeURIComponent(u.id)+(to?'?reasignar_a='+encodeURIComponent(to):'')).then(function(j){
+        DB.leads.forEach(function(l){if(l.asignado_a===u.id)l.asignado_a=to||null;});
+        audits('users','delete',u.id,{reasignar_a:to||null});
+        return loadUsers().then(function(){persistDB();toast('Empleado borrado'+(j.leads_reasignados?(' · '+j.leads_reasignados+' leads reasignados'):''),'ok');closeModal();render();if(typeof syncNow==='function')syncNow();});
+      }).catch(function(e){err.textContent=e.message;});
     };}});
 }
 
@@ -3307,6 +3421,7 @@ function startSyncLoop(){
   window.addEventListener('online',function(){syncNow();});
   setTimeout(syncNow,800);
 }
+function stopSyncLoop(){if(SYNC.timer){clearInterval(SYNC.timer);SYNC.timer=null;}}
 function syncStatusText(){
   if(!backendConfigured())return '';
   if(!backendLogged())return ' · Servidor: sin sesión';
@@ -3433,14 +3548,14 @@ function openLeadWebModal(id){openDemoStudio(id);}
    INIT
    ========================================================================= */
 bindDelegates();
-document.title='Digitaliza CRM v'+APP_VERSION+' · Multi-desk de captación';
+document.title='UTOP-IA CRM · v'+APP_VERSION;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();if(S.aiOpen){S.aiOpen=false;mountAI();}}});
 window.addEventListener('resize',()=>{const t=$('#navToggle');if(t)t.style.display=window.innerWidth<=960?'inline-flex':'none';});
 restoreSettings();
 restoreDB();
 S.route=location.hash||'#/login';
 render();
-if(backendConfigured()&&backendLogged())startSyncLoop();
+restoreSession();
 const nt=$('#navToggle');if(nt)nt.style.display=window.innerWidth<=960?'inline-flex':'none';
 </script>
 </body>

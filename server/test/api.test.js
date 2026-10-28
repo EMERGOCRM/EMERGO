@@ -614,3 +614,83 @@ test('al subir leads antiguos se conserva su fecha de alta (nunca en el futuro)'
   assert.ok(new Date(f.created_at).getTime() <= Date.now() + 1000);
   assert.ok(Math.abs(new Date(n.created_at).getTime() - Date.now()) < 60000);
 });
+
+// --- Gestión de empleados (v1.4.0) -----------------------------------------
+
+test('el admin edita todos los datos de un empleado: nombre, email, rol, desk y contraseña', async () => {
+  const c = await call('POST', '/api/users', {
+    token: tokens.admin,
+    body: { id: 'u20', email: 'pepe@test.es', nombre: 'Pepe', rol: 'comercial', desk: 'leads', password: 'pepe-clave-123' }
+  });
+  assert.equal(c.status, 201, JSON.stringify(c.json));
+  assert.equal(c.json.user.desk, 'leads');
+
+  const p = await call('PATCH', '/api/users/u20', {
+    token: tokens.admin,
+    body: { nombre: 'José Pérez', email: 'JOSE@test.es', rol: 'supervisor', desk: 'todos', password: 'nueva-clave-456' }
+  });
+  assert.equal(p.status, 200, JSON.stringify(p.json));
+  assert.equal(p.json.user.email, 'jose@test.es');
+  assert.equal(p.json.user.rol, 'supervisor');
+  assert.equal(p.json.user.desk, 'todos');
+  assert.equal(p.json.user.nombre, 'José Pérez');
+
+  // la contraseña y el email antiguos dejan de valer; los nuevos funcionan
+  assert.equal((await call('POST', '/api/auth/login', { body: { email: 'pepe@test.es', password: 'pepe-clave-123' } })).status, 401);
+  const ok = await call('POST', '/api/auth/login', { body: { email: 'jose@test.es', password: 'nueva-clave-456' } });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.json.user.desk, 'todos');
+});
+
+test('no se puede poner a un empleado el email de otro', async () => {
+  const r = await call('PATCH', '/api/users/u20', { token: tokens.admin, body: { email: 'lucia@test.es' } });
+  assert.equal(r.status, 409);
+});
+
+test('borrar un empleado reasigna sus leads y le corta el acceso', async () => {
+  await call('POST', '/api/users', {
+    token: tokens.admin,
+    body: { id: 'u21', email: 'borrar@test.es', rol: 'comercial', password: 'borrar-12345' }
+  });
+  const t = await login('borrar@test.es', 'borrar-12345');
+  const l = await call('POST', '/api/leads', {
+    token: tokens.admin,
+    body: { leads: [{ id: 'LB1', nombre: 'Lead de borrar', asignado_a: 'u21' }] }
+  });
+  assert.equal(l.status, 200, JSON.stringify(l.json));
+
+  const bad = await call('DELETE', '/api/users/u21?reasignar_a=noexiste', { token: tokens.admin });
+  assert.equal(bad.status, 400);
+
+  const d = await call('DELETE', '/api/users/u21?reasignar_a=u3', { token: tokens.admin });
+  assert.equal(d.status, 200, JSON.stringify(d.json));
+  assert.equal(d.json.leads_reasignados, 1);
+  const rows = await db.query("SELECT asignado_a FROM leads WHERE nombre = 'Lead de borrar'");
+  assert.equal(rows[0].asignado_a, 'u3');
+  assert.equal((await call('GET', '/api/leads', { token: t })).status, 401);
+});
+
+test('el admin no puede borrarse a sí mismo ni dejar el sistema sin administradores', async () => {
+  const me = await call('GET', '/api/auth/me', { token: tokens.admin });
+  const self = await call('DELETE', `/api/users/${me.json.user.id}`, { token: tokens.admin });
+  assert.equal(self.status, 400);
+  const demote = await call('PATCH', `/api/users/${me.json.user.id}`, { token: tokens.admin, body: { rol: 'comercial' } });
+  assert.equal(demote.status, 400);
+});
+
+test('un comercial ve los nombres del equipo pero no sus emails, y no puede borrar', async () => {
+  const r = await call('GET', '/api/users', { token: tokens.lucia });
+  assert.equal(r.status, 200);
+  assert.ok(r.json.users.length >= 3);
+  assert.equal(r.json.users[0].email, undefined);
+  const d = await call('DELETE', '/api/users/u4', { token: tokens.lucia });
+  assert.equal(d.status, 403);
+});
+
+test('cada usuario cambia su propia contraseña sabiendo la actual', async () => {
+  const bad = await call('POST', '/api/auth/password', { token: tokens.javier, body: { actual: 'mal', nueva: 'otra-clave-789' } });
+  assert.equal(bad.status, 400);
+  const ok = await call('POST', '/api/auth/password', { token: tokens.javier, body: { actual: 'comercial-123456', nueva: 'otra-clave-789' } });
+  assert.equal(ok.status, 200);
+  assert.equal((await call('POST', '/api/auth/login', { body: { email: 'javier@test.es', password: 'otra-clave-789' } })).status, 200);
+});

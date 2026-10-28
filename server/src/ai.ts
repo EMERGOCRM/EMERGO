@@ -127,7 +127,7 @@ export async function aiChat(messages: ChatMessage[], temperature = 0.6): Promis
   }
 }
 
-const UA = 'DigitalizaCRM/1.1 (+investigación pública de negocios)';
+const UA = 'UtopiaCRM/1.4 (+investigación pública de negocios)';
 const MAX_BYTES = 450_000;
 
 async function fetchPage(raw: string): Promise<PageInfo> {

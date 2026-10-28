@@ -151,8 +151,8 @@ export async function bootstrapAdmin(): Promise<void> {
         return;
       }
       await query(
-        `INSERT INTO users (id, email, nombre, rol, pass_hash, activo)
-         VALUES ($1, $2, $3, 'admin', $4, true)
+        `INSERT INTO users (id, email, nombre, rol, desk, pass_hash, activo)
+         VALUES ($1, $2, $3, 'admin', 'todos', $4, true)
          ON CONFLICT (id) DO NOTHING`,
         [env.adminId, email, env.adminName, hashPassword(pass)]
       );

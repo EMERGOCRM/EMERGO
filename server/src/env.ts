@@ -58,7 +58,7 @@ export const env = {
   anthropicApi: str('ANTHROPIC_API', 'https://api.anthropic.com/v1'),
   demoModel: str('DEMO_MODEL', ''),
   demoTimeoutMs: int('DEMO_TIMEOUT_MS', 240000),
-  demoBrand: str('DEMO_BRAND', 'Emergo'),
+  demoBrand: str('DEMO_BRAND', 'UTOP-IA'),
 
   // URL pública de la app (para enlaces de demo y fotos). Si falta, se deduce
   // de la petición.
