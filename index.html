@@ -99,6 +99,13 @@ button{font-family:inherit;font-size:inherit;cursor:pointer}
 .btn.outline:hover{background:var(--surface-2);border-color:var(--muted-2)}
 .btn.ghost{background:transparent;color:var(--muted)}
 .btn.ghost:hover{background:var(--surface-3);color:var(--ink)}
+.pager{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:14px;padding:12px 4px}
+.pg-nav{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+.pg-btn{min-width:36px;height:34px;padding:0 10px;border:1px solid var(--line,#E3E7EE);background:var(--surface,#fff);border-radius:8px;font-family:inherit;font-size:13px;font-weight:500;color:var(--ink-2,#2A3346);cursor:pointer}
+.pg-btn:hover:not([disabled]){border-color:var(--accent);color:var(--accent)}
+.pg-btn.on{background:#2547D0;border-color:#2547D0;color:#fff!important}
+.pg-btn[disabled]{opacity:.4;cursor:default}
+.pg-gap{padding:0 4px;color:var(--muted)}
 .btn.danger{background:var(--danger);color:#fff}
 .btn.danger:hover{filter:brightness(1.08)}
 .btn.ok{background:var(--ok);color:#fff}
@@ -365,7 +372,7 @@ button{font-family:inherit;font-size:inherit;cursor:pointer}
 
 /* Versión visible de la app. Subir en CADA cambio y mantener sincronizados:
    APP_VERSION (aquí), VERSION, README.md y server/package.json. */
-const APP_VERSION='1.4.1';
+const APP_VERSION='1.4.2';
 const APP_RELEASE='28/10/2026';
 
 /* ---------- iconos (familia única, trazo 1.8) ---------- */
@@ -586,7 +593,7 @@ function paintLeadSel(){
   const bar=document.getElementById('bulkBar');if(bar)bar.style.display=n?'':'none';
   const cnt=document.getElementById('bulkCount');if(cnt)cnt.textContent=n;
   const sb=document.getElementById('selectAllBtn');
-  if(sb){const allOn=rows.length>0&&n===rows.length;sb.innerHTML=icon(allOn?'x':'check','sm')+' '+(allOn?'Quitar selección':'Seleccionar todos ('+rows.length+')');}
+  if(sb){const allOn=rows.length>0&&n===rows.length;sb.innerHTML=icon(allOn?'x':'check','sm')+' '+(allOn?'Quitar selección':'Seleccionar página ('+rows.length+')');}
   const nc=document.getElementById('bulkNoContact');
   if(nc){
     const blocked=n>0&&ids.every(function(id){const l=leadById(id);return l&&l.no_contactar;});
@@ -938,7 +945,8 @@ function leadAlta(l){
 function leadView(){
   if(!S.leadView){
     let v=null;try{v=JSON.parse(localStorage.getItem('od.leadView')||'null');}catch(e){}
-    S.leadView=Object.assign({sort:'created',dir:'desc',sector:'',ciudad:'',search:'',alta:''},v||{});
+    S.leadView=Object.assign({sort:'created',dir:'desc',sector:'',ciudad:'',search:'',alta:'',per:20},v||{});
+    if([20,50,100].indexOf(+S.leadView.per)<0)S.leadView.per=20;
     if(!LEAD_SORTS[S.leadView.sort])S.leadView.sort='created';
   }
   return S.leadView;
@@ -1000,13 +1008,20 @@ function viewLeadList(){
   if(lv.search)leads=leads.filter(l=>l.search_id===lv.search);
   if(lv.alta){const cut=altaCutoff(lv.alta);leads=leads.filter(l=>{const a=leadAlta(l);return a&&a>=cut;});}
   sortLeads(leads);
+  /* Paginación (v1.4.2): 20/50/100 por página. La selección solo afecta a la página visible. */
+  const per=+lv.per||20,total=leads.length,pages=Math.max(1,Math.ceil(total/per));
+  const sig=[f,wf,q,lv.sector,lv.ciudad,lv.search,lv.alta,lv.sort,lv.dir,per].join('|');
+  if(S.leadSig!==sig){S.leadSig=sig;S.leadPage=1;}
+  const page=Math.min(Math.max(1,S.leadPage||1),pages);S.leadPage=page;
+  const from=(page-1)*per;
+  const pageLeads=leads.slice(from,from+per);
   const selCount=leadSelIds().length;
-  const allSel=leads.length>0&&leads.every(function(l){return !!(S.leadSel||{})[l.id];});
+  const allSel=pageLeads.length>0&&pageLeads.every(function(l){return !!(S.leadSel||{})[l.id];});
   const all=visibleLeads();
   const counts=ESTADOS_LEAD.reduce((m,e)=>{m[e]=all.filter(l=>l.estado===e).length;return m;},{});
   const wCounts={sin_web:all.filter(l=>!l.web_tipo).length,solo_redes:all.filter(l=>l.web_tipo&&l.web_tipo!=='propia').length,con_web:all.filter(l=>l.web_tipo==='propia').length};
   return '<div class="page-head"><div><h1>Leads</h1><div class="page-sub">'+leads.length+' registros en tu ámbito · ordenados por '+esc(LEAD_SORTS[lv.sort].label)+' ('+(lv.dir==='asc'?'ascendente':'descendente')+')</div></div>'+
-    '<div class="row gap8">'+(canReassign()?('<button class="btn outline" data-bulkassign>'+icon('users','sm')+' Asignar a comercial</button>'):'')+'<button class="btn ghost" id="selectAllBtn">'+icon('check','sm')+' Seleccionar visibles</button><button class="btn outline" id="exportLeads">'+icon('download','sm')+' Exportar CSV</button>'+(isAdmin()?('<button class="btn primary" data-go="#/leads/search">'+icon('plus','sm')+' Buscar nuevos</button>'):'')+'</div></div>'+
+    '<div class="row gap8">'+(canReassign()?('<button class="btn outline" data-bulkassign>'+icon('users','sm')+' Asignar a comercial</button>'):'')+'<button class="btn ghost" id="selectAllBtn">'+icon('check','sm')+' Seleccionar página ('+pageLeads.length+')</button><button class="btn outline" id="exportLeads">'+icon('download','sm')+' Exportar CSV</button>'+(isAdmin()?('<button class="btn primary" data-go="#/leads/search">'+icon('plus','sm')+' Buscar nuevos</button>'):'')+'</div></div>'+
   '<div class="chipbar mb8"><button class="pill-btn '+(f==='todos'?'on':'')+'" data-filter="todos">Todos · '+all.length+'</button>'+
     ESTADOS_LEAD.map(e=>counts[e]?'<button class="pill-btn '+(f===e?'on':'')+'" data-filter="'+e+'">'+ESTADOS[e].label+' · '+counts[e]+'</button>':'').join('')+'</div>'+
   '<div class="chipbar mb16"><span class="tiny muted" style="align-self:center;margin-right:4px">Presencia online:</span><button class="pill-btn '+(wf==='todos'?'on':'')+'" data-webfilter="todos">Toda · '+all.length+'</button>'+
@@ -1023,7 +1038,7 @@ function viewLeadList(){
     '<button class="btn ghost sm" id="bulkClear">'+icon('x','sm')+' Quitar selección</button>'+
   '</div></div></div>'+
   '<div class="card tbl-wrap">'+(leads.length?'<table class="table"><thead><tr><th class="selcol"><input type="checkbox" id="selAll" aria-label="Seleccionar todos los leads visibles"'+(allSel?' checked':'')+'></th>'+sortTh('score','')+sortTh('nombre','Negocio')+sortTh('sector','Sector')+sortTh('ciudad','Ciudad')+sortTh('web','Web')+sortTh('rating','Reputación')+sortTh('estado','Estado')+sortTh('asignado','Asignado')+sortTh('proxima','Próxima')+sortTh('created','Alta')+'</tr></thead><tbody>'+
-    leads.map(l=>'<tr class="clickable" data-lead-row="'+l.id+'" data-go="#/leads/'+l.id+'">'+
+    pageLeads.map(l=>'<tr class="clickable" data-lead-row="'+l.id+'" data-go="#/leads/'+l.id+'">'+
       '<td class="selcol"><input type="checkbox" data-select="'+l.id+'" aria-label="Seleccionar '+esc(l.nombre)+'"'+((S.leadSel||{})[l.id]?' checked':'')+'></td>'+
       '<td>'+scoreBadge(l.score)+'</td>'+
       '<td><div class="lead-name">'+esc(l.nombre)+'</div><div class="lead-sub mono">'+esc(l.place_id)+'</div></td>'+
@@ -1035,7 +1050,22 @@ function viewLeadList(){
       '<td class="small">'+esc(userById(l.asignado_a).nombre.split(' ')[0])+'</td>'+
       '<td class="small '+(l.proxima_accion&&isToday(l.proxima_accion)?'strong':'muted')+'">'+(l.proxima_accion?fmtDate(l.proxima_accion):'—')+'</td>'+
       '<td class="small nowrap muted" title="Fecha en que entró al CRM">'+(leadAlta(l)?esc(fmtDateTime(leadAlta(l))):'—')+'</td>'+
-    '</tr>').join('')+'</tbody></table>':'<div class="empty">'+icon('filter','lg')+'<p>No hay leads que coincidan con este filtro.</p>'+(S.user.rol==='comercial'?'<p class="small muted">El administrador te irá asignando leads a tu portafolio.</p>':'')+'</div>')+'</div>';
+    '</tr>').join('')+'</tbody></table>':'<div class="empty">'+icon('filter','lg')+'<p>No hay leads que coincidan con este filtro.</p>'+(S.user.rol==='comercial'?'<p class="small muted">El administrador te irá asignando leads a tu portafolio.</p>':'')+'</div>')+'</div>'+
+  (total?leadPager(page,pages,per,from,pageLeads.length,total):'');
+}
+function leadPager(page,pages,per,from,shown,total){
+  const nums=[];const add=function(n){if(nums.indexOf(n)<0&&n>=1&&n<=pages)nums.push(n);};
+  add(1);for(let i=page-2;i<=page+2;i++)add(i);add(pages);nums.sort(function(a,b){return a-b;});
+  let html='',prev=0;
+  nums.forEach(function(n){if(prev&&n-prev>1)html+='<span class="pg-gap">…</span>';html+='<button class="pg-btn'+(n===page?' on':'')+'" data-page="'+n+'"'+(n===page?' aria-current="page"':'')+'>'+n+'</button>';prev=n;});
+  return '<div class="pager">'+
+    '<span class="small muted">Mostrando <b>'+(from+1)+'–'+(from+shown)+'</b> de <b>'+total+'</b></span>'+
+    '<div class="pg-nav">'+
+      '<button class="pg-btn" data-page="'+(page-1)+'"'+(page<=1?' disabled':'')+' aria-label="Página anterior">‹ Anterior</button>'+html+
+      '<button class="pg-btn" data-page="'+(page+1)+'"'+(page>=pages?' disabled':'')+' aria-label="Página siguiente">Siguiente ›</button>'+
+    '</div>'+
+    '<label class="small muted row gap8" style="align-items:center">Por página <select class="select" id="lpPer" style="height:32px;width:auto;font-size:13px">'+[20,50,100].map(function(n){return '<option value="'+n+'"'+(n===per?' selected':'')+'>'+n+'</option>';}).join('')+'</select></label>'+
+  '</div>';
 }
 
 function searchStatusBadge(s){
@@ -2116,7 +2146,7 @@ function loadDatasetFile(input){
 function bindDelegates(){
   document.addEventListener('click',function(e){
     if(e.target.closest('[data-select],#selAll'))return;
-    const t=e.target.closest('[data-go],[data-filter],[data-webfilter],[data-bulkassign],[data-tab],[data-estado],[data-call],[data-demo],[data-send],[data-addnote],[data-ticket],[data-edituser],[data-deluser],[data-tfilter],[data-newticket],[data-toggle-nocontact],[data-reassign],[data-next],[data-score],[data-newarticle],[data-kbview],[data-source],[data-webhooktest],[data-notif],[data-demoopen],[data-web],[data-copyprompt],[data-del-lead],[data-del-search],[data-undo-search],[data-sort],#lfDir,#lfClear,#exportLeads,#exportClients,#runSearch,#resetSearch,#quickSearch,#importDataset,#newUser,#apifySave,#apifyClear,#apifyTest,#apiSave,#apiClear,#apiLogin,#apiLogout,#syncNow,#aiSave,#aiClear,#dbExport,#dbImportBtn,#bulkAssign,#bulkStatus,#bulkNoContact,#bulkExport,#bulkDelete,#bulkClear,#selectAllBtn,#undoLastSearch,#clearSearchHistory');
+    const t=e.target.closest('[data-go],[data-filter],[data-webfilter],[data-bulkassign],[data-tab],[data-estado],[data-call],[data-demo],[data-send],[data-addnote],[data-ticket],[data-edituser],[data-deluser],[data-tfilter],[data-newticket],[data-toggle-nocontact],[data-reassign],[data-next],[data-score],[data-newarticle],[data-kbview],[data-source],[data-webhooktest],[data-notif],[data-demoopen],[data-web],[data-copyprompt],[data-del-lead],[data-del-search],[data-undo-search],[data-sort],[data-page],#lfDir,#lfClear,#exportLeads,#exportClients,#runSearch,#resetSearch,#quickSearch,#importDataset,#newUser,#apifySave,#apifyClear,#apifyTest,#apiSave,#apiClear,#apiLogin,#apiLogout,#syncNow,#aiSave,#aiClear,#dbExport,#dbImportBtn,#bulkAssign,#bulkStatus,#bulkNoContact,#bulkExport,#bulkDelete,#bulkClear,#selectAllBtn,#undoLastSearch,#clearSearchHistory');
     if(!t)return;
     if(t.hasAttribute('data-go')){go(t.getAttribute('data-go'));return;}
     if(t.hasAttribute('data-sort')){const v=leadView();const k=t.getAttribute('data-sort');if(v.sort===k)v.dir=v.dir==='asc'?'desc':'asc';else{v.sort=k;v.dir=(['nombre','sector','ciudad','asignado','proxima','estado'].indexOf(k)>=0)?'asc':'desc';}saveLeadView();render();return;}
@@ -2140,6 +2170,7 @@ function bindDelegates(){
     if(t.hasAttribute('data-del-lead')){bulkDeleteLeads([t.getAttribute('data-del-lead')]);return;}
     if(t.id==='aiSave'){saveAISettings();return;}
     if(t.id==='aiClear'){clearAISettings();return;}
+    if(t.hasAttribute('data-page')){if(t.disabled)return;S.leadPage=parseInt(t.getAttribute('data-page'),10)||1;S.leadSel={};render();const tb=document.querySelector('.tbl-wrap');if(tb)tb.scrollIntoView({block:'start'});return;}
     if(t.id==='selectAllBtn'){
       const rows=document.querySelectorAll('[data-lead-row]');
       const all=rows.length>0&&leadSelIds().length===rows.length;
@@ -2185,6 +2216,7 @@ function bindDelegates(){
   });
   document.addEventListener('change',function(e){
     if(e.target.id==='selAll'){selectAllVisible(e.target.checked);return;}
+    if(e.target.id==='lpPer'){const v=leadView();v.per=parseInt(e.target.value,10)||20;saveLeadView();S.leadPage=1;S.leadSel={};render();return;}
     if(['lfSector','lfCiudad','lfAlta','lfSearch','lfSort'].indexOf(e.target.id)>=0){
       const v=leadView();const k={lfSector:'sector',lfCiudad:'ciudad',lfAlta:'alta',lfSearch:'search',lfSort:'sort'}[e.target.id];
       v[k]=e.target.value;if(k==='sort')v.dir=(['nombre','sector','ciudad','asignado','proxima','estado'].indexOf(v.sort)>=0)?'asc':'desc';

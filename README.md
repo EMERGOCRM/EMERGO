@@ -6,6 +6,12 @@ Este repositorio contiene el frontend estático (`index.html`) **y** el API
 
 ## Versión
 
+**1.4.2 (28/10/2026) · Leads paginados**
+
+- La lista de leads se muestra de 20 en 20 (o 50 / 100), con paginación abajo.
+- «Seleccionar página» solo marca los leads de la página visible, para asignar o borrar por bloques.
+- Al cambiar de página se limpia la selección; al cambiar filtros u orden se vuelve a la página 1.
+
 **1.4.1 (28/10/2026) · Marca UTOP-IA y área de empleados**
 
 - El CRM pasa a llamarse UTOP-IA CRM (logo, colores azul marino, textos y demos).
@@ -22,7 +28,7 @@ Este repositorio contiene el frontend estático (`index.html`) **y** el API
 - «Mi cuenta» (icono del escudo, abajo a la izquierda): cada usuario cambia su propia contraseña.
 - API nueva: `DELETE /api/users/:id?reasignar_a=`, `POST /api/auth/password`; `PATCH /api/users/:id` acepta `email` y `desk`.
 
-**Versión actual: 1.4.1** (28/10/2026)
+**Versión actual: 1.4.2** (28/10/2026)
 
 - Se muestra en la app (sidebar, login y Configuración) y en `VERSION`.
 - Antes de generar cada ZIP, sube la versión en **los cuatro sitios**:
