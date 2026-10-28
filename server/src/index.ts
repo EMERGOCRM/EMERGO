@@ -14,6 +14,8 @@ import searchesRoutes from './routes/searches';
 import { mediaRouter } from './places';
 import { demosApi, demosPublic } from './demos';
 
+const APP_VERSION = '1.4.3';
+
 const app = express();
 
 app.disable('x-powered-by');
@@ -36,7 +38,14 @@ app.get('/health', async (_req: Request, res: Response) => {
     ai: { configured: hasAI(), model: hasAI() ? env.openaiModel : null },
     google: { configured: hasGoogle() },
     provider: activeProvider(),
-    demos: { configured: hasDemoAI() }
+    demos: {
+      configured: hasDemoAI(),
+      provider: env.anthropicApiKey.trim() ? 'anthropic' : env.openaiApiKey.trim() ? 'openai' : null,
+      model: env.demoModel,
+      budget_usd: env.demoBudgetUsd
+    },
+    version: APP_VERSION,
+    commit: (process.env.RAILWAY_GIT_COMMIT_SHA || '').slice(0, 7) || null
   });
 });
 

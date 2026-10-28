@@ -56,8 +56,19 @@ export const env = {
   // endpoint compatible con OpenAI de arriba (con DEMO_MODEL si se define).
   anthropicApiKey: str('ANTHROPIC_API_KEY', ''),
   anthropicApi: str('ANTHROPIC_API', 'https://api.anthropic.com/v1'),
-  demoModel: str('DEMO_MODEL', ''),
-  demoTimeoutMs: int('DEMO_TIMEOUT_MS', 240000),
+  // Modelo económico para las webs de demo: la IA solo redacta los textos
+  // (≈1.000 tokens) y el servidor los pinta en una plantilla profesional.
+  demoModel: str('DEMO_MODEL', 'claude-haiku-5-5'),
+  demoMaxTokens: int('DEMO_MAX_TOKENS', 1200),
+  // Versión «premium» (HTML completo con IA, solo admin). Mucho más cara.
+  demoPremiumModel: str('DEMO_PREMIUM_MODEL', 'claude-sonnet-5-5'),
+  // Límites de gasto: demos web con IA por usuario y día, presupuesto mensual
+  // en dólares (al llegar, se sigue generando con plantilla sin IA, coste 0) y
+  // días durante los que se reutiliza la demo ya creada de un negocio.
+  demoDailyLimit: int('DEMO_DAILY_LIMIT', 20),
+  demoBudgetUsd: Number(str('DEMO_BUDGET_USD', '15')) || 0,
+  demoReuseDays: int('DEMO_REUSE_DAYS', 30),
+  demoTimeoutMs: int('DEMO_TIMEOUT_MS', 60000),
   demoBrand: str('DEMO_BRAND', 'UTOP-IA'),
 
   // URL pública de la app (para enlaces de demo y fotos). Si falta, se deduce

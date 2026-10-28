@@ -6,13 +6,14 @@ import { ah, HttpError, makeRateLimiter } from './http';
 import { researchPages } from './ai';
 import { isSocialUrl, optStr } from './validate';
 import { visibility } from './routes/leads';
+import { buildCopyPrompt, COPY_SYSTEM, fallbackCopy, parseCopy, renderWebDemo } from './webTemplate';
 
 /**
  * Demos para enseñar al cliente.
  *
- *  - Web: la genera una IA a partir de TODO lo que sabemos del negocio
- *    (ficha de Maps, reseñas reales, fotos reales, horario, redes y lo que
- *    haya en sus enlaces públicos). Se publica en /demo/<slug>.
+ *  - Web: plantilla profesional con los datos, fotos y reseñas reales; la IA
+ *    (Haiku, barata) solo redacta los textos. Se publica en /demo/<slug>.
+ *    Modo premium (admin): la IA diseña la web completa.
  *  - CRM: plantilla profesional personalizada con el negocio (sin IA: es
  *    rápida, gratis y siempre se ve bien).
  *
@@ -242,14 +243,37 @@ Una web completa con React + Tailwind (una sola página con secciones y menú), 
 
 // --- Llamada a la IA ---------------------------------------------------------
 
-async function callModel(prompt: string): Promise<{ text: string; model: string }> {
+/** Precio en USD por millón de tokens (entrada, salida). */
+const PRICES: [RegExp, number, number][] = [
+  [/haiku/i, 0.1, 0.5],
+  [/sonnet/i, 2, 10],
+  [/opus/i, 4, 20],
+  [/gpt-4o-mini|mini/i, 0.15, 0.6],
+  [/gpt/i, 2.5, 10]
+];
+
+export function costUsd(model: string, inTok: number, outTok: number): number {
+  const p = PRICES.find(([re]) => re.test(model));
+  if (!p) return 0;
+  return (inTok * p[1] + outTok * p[2]) / 1_000_000;
+}
+
+interface ModelOut {
+  text: string;
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+}
+
+async function callModel(
+  prompt: string,
+  opts: { system: string; model: string; maxTokens: number; json?: boolean }
+): Promise<ModelOut> {
   const ctrl = new AbortController();
   const to = setTimeout(() => ctrl.abort(), env.demoTimeoutMs);
-  const system =
-    'Eres un diseñador y desarrollador web de primer nivel. Respondes únicamente con un documento HTML completo y válido.';
   try {
     if (env.anthropicApiKey.trim()) {
-      const model = env.demoModel || 'claude-sonnet-5-5';
+      const model = opts.model;
       const res = await fetch(`${env.anthropicApi.replace(/\/+$/, '')}/messages`, {
         method: 'POST',
         headers: {
@@ -257,18 +281,29 @@ async function callModel(prompt: string): Promise<{ text: string; model: string 
           'x-api-key': env.anthropicApiKey.trim(),
           'anthropic-version': '2023-06-01'
         },
-        body: JSON.stringify({ model, max_tokens: 20000, system, messages: [{ role: 'user', content: prompt }] }),
+        body: JSON.stringify({
+          model,
+          max_tokens: opts.maxTokens,
+          system: opts.system,
+          messages: [{ role: 'user', content: prompt }]
+        }),
         signal: ctrl.signal
       });
       const j = (await res.json().catch(() => ({}))) as {
         content?: { type: string; text?: string }[];
+        usage?: { input_tokens?: number; output_tokens?: number };
         error?: { message?: string };
       };
       if (!res.ok) throw new HttpError(502, `IA (Anthropic): ${j.error?.message || `HTTP ${res.status}`}`);
-      return { text: (j.content || []).filter((c) => c.type === 'text').map((c) => c.text || '').join(''), model };
+      return {
+        text: (j.content || []).filter((c) => c.type === 'text').map((c) => c.text || '').join(''),
+        model,
+        input_tokens: Number(j.usage?.input_tokens || 0),
+        output_tokens: Number(j.usage?.output_tokens || 0)
+      };
     }
     if (env.openaiApiKey.trim()) {
-      const model = env.demoModel || env.openaiModel;
+      const model = /claude/i.test(opts.model) ? env.openaiModel : opts.model;
       const base = env.openaiBaseUrl.replace(/\/+$/, '');
       const url = /\/chat\/completions$/.test(base) ? base : `${base}/chat/completions`;
       const res = await fetch(url, {
@@ -277,8 +312,10 @@ async function callModel(prompt: string): Promise<{ text: string; model: string 
         body: JSON.stringify({
           model,
           temperature: 0.7,
+          max_tokens: opts.maxTokens,
+          ...(opts.json ? { response_format: { type: 'json_object' } } : {}),
           messages: [
-            { role: 'system', content: system },
+            { role: 'system', content: opts.system },
             { role: 'user', content: prompt }
           ]
         }),
@@ -286,10 +323,16 @@ async function callModel(prompt: string): Promise<{ text: string; model: string 
       });
       const j = (await res.json().catch(() => ({}))) as {
         choices?: { message?: { content?: string } }[];
+        usage?: { prompt_tokens?: number; completion_tokens?: number };
         error?: { message?: string };
       };
       if (!res.ok) throw new HttpError(502, `IA: ${j.error?.message || `HTTP ${res.status}`}`);
-      return { text: j.choices?.[0]?.message?.content || '', model };
+      return {
+        text: j.choices?.[0]?.message?.content || '',
+        model,
+        input_tokens: Number(j.usage?.prompt_tokens || 0),
+        output_tokens: Number(j.usage?.completion_tokens || 0)
+      };
     }
     throw new HttpError(503, 'No hay IA configurada para demos (ANTHROPIC_API_KEY u OPENAI_API_KEY)');
   } catch (e) {
@@ -298,6 +341,42 @@ async function callModel(prompt: string): Promise<{ text: string; model: string 
   } finally {
     clearTimeout(to);
   }
+}
+
+// --- Control de gasto ---------------------------------------------------------
+
+export interface DemoUsage {
+  mes_usd: number;
+  mes_demos_ia: number;
+  mes_demos_total: number;
+  hoy_usuario: number;
+  limite_diario: number;
+  presupuesto_usd: number;
+  presupuesto_agotado: boolean;
+}
+
+async function usageFor(userId: string): Promise<DemoUsage> {
+  const [m] = await query<{ usd: string; ia: string; total: string }>(
+    `SELECT COALESCE(sum(coste_usd),0)::text AS usd,
+            count(*) FILTER (WHERE input_tokens IS NOT NULL)::text AS ia,
+            count(*)::text AS total
+       FROM demos WHERE tipo = 'web' AND created_at >= date_trunc('month', now())`
+  );
+  const [d] = await query<{ n: string }>(
+    `SELECT count(*)::text AS n FROM demos
+      WHERE tipo = 'web' AND created_by = $1 AND input_tokens IS NOT NULL AND created_at >= date_trunc('day', now())`,
+    [userId]
+  );
+  const mesUsd = Number(m?.usd || 0);
+  return {
+    mes_usd: Math.round(mesUsd * 10000) / 10000,
+    mes_demos_ia: Number(m?.ia || 0),
+    mes_demos_total: Number(m?.total || 0),
+    hoy_usuario: Number(d?.n || 0),
+    limite_diario: env.demoDailyLimit,
+    presupuesto_usd: env.demoBudgetUsd,
+    presupuesto_agotado: env.demoBudgetUsd > 0 && mesUsd >= env.demoBudgetUsd
+  };
 }
 
 export function extractHtml(text: string): string {
@@ -431,9 +510,24 @@ demosApi.post(
   })
 );
 
+/** GET /api/demos/usage — gasto del mes y demos de hoy del usuario. */
+demosApi.get(
+  '/demos/usage',
+  ah(async (req, res) => {
+    res.json({ usage: await usageFor(req.user!.id) });
+  })
+);
+
 /**
- * POST /api/demos { lead_id, tipo: 'web'|'crm', notas?, analizar? }
- * Genera y publica la demo. Devuelve { demo: { id, slug, url, tipo }, lovable_url }.
+ * POST /api/demos { lead_id, tipo: 'web'|'crm', notas?, analizar?, regenerar?, calidad?: 'premium' }
+ *
+ * Web (modo normal, barato): la IA solo redacta los textos (JSON corto) y el
+ * servidor monta la web con una plantilla profesional. Si no hay IA, se ha
+ * llegado al límite diario o al presupuesto del mes, los textos salen de la
+ * plantilla por sector (coste 0). Si el negocio ya tiene una demo reciente, se
+ * reutiliza salvo que se pida `regenerar: true`.
+ *
+ * `calidad: 'premium'` (solo admin): la IA diseña la web completa (caro).
  */
 demosApi.post(
   '/demos',
@@ -442,29 +536,93 @@ demosApi.post(
     if (!leadId) throw new HttpError(400, 'Falta lead_id');
     const tipo = req.body?.tipo === 'crm' ? 'crm' : 'web';
     const user = req.user!;
+    const premium = tipo === 'web' && req.body?.calidad === 'premium';
+    if (premium && user.rol !== 'admin') throw new HttpError(403, 'La versión premium solo la puede generar un administrador');
+    const base = publicBase(req);
+
+    // 1) Reutilizar la demo reciente del negocio (no gasta nada).
+    if (req.body?.regenerar !== true && !premium) {
+      const args: unknown[] = [leadId];
+      const vis = visibility(user, args);
+      const okLead = await query(`SELECT 1 FROM leads WHERE id = $1 AND ${vis}`, args);
+      if (!okLead.length) throw new HttpError(404, 'Lead no encontrado');
+      const prev = await query<Record<string, unknown> & { slug: string }>(
+        `SELECT id, slug, tipo, modelo, calidad, visitas, created_at FROM demos
+          WHERE lead_id = $1 AND tipo = $2 AND created_at >= now() - ($3::int * interval '1 day')
+          ORDER BY created_at DESC LIMIT 1`,
+        [leadId, tipo, Math.max(0, env.demoReuseDays)]
+      );
+      if (prev.length && env.demoReuseDays > 0) {
+        res.json({ demo: { ...prev[0], url: `${base}/demo/${prev[0].slug}` }, reutilizada: true, coste_usd: 0 });
+        return;
+      }
+    }
+
     if (tipo === 'web' && !genLimit(`u:${user.id}`, 40)) {
       throw new HttpError(429, 'Has generado muchas demos en la última hora. Espera un poco.');
     }
-    const ctx = await buildContext(req, leadId, req.body?.analizar !== false);
+    // Analizar enlaces públicos solo si lo piden (ahorra tiempo y tokens).
+    const ctx = await buildContext(req, leadId, premium || req.body?.analizar === true);
     const notas = optStr(req.body?.notas, 2000) || '';
 
     let html: string;
     let prompt: string | null = null;
     let modelo: string | null = null;
+    let calidad: string | null = null;
+    let inTok: number | null = null;
+    let outTok: number | null = null;
+    let coste = 0;
+    let aviso: string | null = null;
+
     if (tipo === 'crm') {
       html = renderCrmDemo(ctx);
-    } else {
+      calidad = 'plantilla';
+    } else if (premium) {
+      if (!hasDemoAI()) throw new HttpError(503, 'No hay IA configurada (ANTHROPIC_API_KEY)');
       prompt = buildWebPrompt(ctx, notas);
-      const out = await callModel(prompt);
+      const out = await callModel(prompt, {
+        system: 'Eres un diseñador y desarrollador web de primer nivel. Respondes únicamente con un documento HTML completo y válido.',
+        model: env.demoPremiumModel,
+        maxTokens: 16000
+      });
       html = withDemoHead(extractHtml(out.text), ctx.nombre);
       modelo = out.model;
+      calidad = 'premium';
+      inTok = out.input_tokens;
+      outTok = out.output_tokens;
+      coste = costUsd(out.model, inTok, outTok);
+    } else {
+      let copy = null;
+      const usage = await usageFor(user.id);
+      const isAdmin = user.rol === 'admin';
+      if (!hasDemoAI()) aviso = 'Sin IA configurada: textos de plantilla.';
+      else if (usage.presupuesto_agotado) aviso = 'Presupuesto de IA del mes agotado: textos de plantilla.';
+      else if (!isAdmin && env.demoDailyLimit >= 0 && usage.hoy_usuario >= env.demoDailyLimit) {
+        aviso = `Has llegado a ${env.demoDailyLimit} demos con IA hoy: textos de plantilla.`;
+      } else {
+        prompt = buildCopyPrompt(ctx, notas);
+        try {
+          const out = await callModel(prompt, { system: COPY_SYSTEM, model: env.demoModel, maxTokens: env.demoMaxTokens, json: true });
+          inTok = out.input_tokens;
+          outTok = out.output_tokens;
+          coste = costUsd(out.model, inTok, outTok);
+          modelo = out.model;
+          copy = parseCopy(out.text, ctx);
+          if (!copy) aviso = 'La IA no devolvió textos válidos: textos de plantilla.';
+        } catch (e) {
+          aviso = `IA no disponible (${(e as Error).message}): textos de plantilla.`;
+        }
+      }
+      calidad = copy ? 'ia' : 'plantilla';
+      html = renderWebDemo(ctx, copy || fallbackCopy(ctx), env.demoBrand);
     }
 
     const id = crypto.randomUUID();
     const slug = `${slugify(ctx.nombre)}-${tipo}-${crypto.randomBytes(3).toString('hex')}`;
     await query(
-      `INSERT INTO demos (id, slug, lead_id, tipo, html, prompt, modelo, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [id, slug, leadId, tipo, html, prompt, modelo, user.id]
+      `INSERT INTO demos (id, slug, lead_id, tipo, html, prompt, modelo, created_by, calidad, input_tokens, output_tokens, coste_usd)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+      [id, slug, leadId, tipo, html, prompt, modelo, user.id, calidad, inTok, outTok, coste]
     );
     await query(
       `INSERT INTO lead_interactions (id, lead_id, user_id, tipo, nota) VALUES ($1,$2,$3,'nota',$4)`,
@@ -472,10 +630,13 @@ demosApi.post(
     );
     await query('UPDATE leads SET updated_at = now() WHERE id = $1', [leadId]);
 
-    const base = publicBase(req);
+    const lovPrompt = tipo === 'web' ? buildLovablePrompt(buildWebPrompt(ctx, notas)) : null;
     res.status(201).json({
-      demo: { id, slug, tipo, url: `${base}/demo/${slug}`, modelo, created_at: new Date().toISOString(), visitas: 0 },
-      lovable_url: prompt ? lovableUrl(buildLovablePrompt(prompt), ctx.photos) : null,
+      demo: { id, slug, tipo, url: `${base}/demo/${slug}`, modelo, calidad, created_at: new Date().toISOString(), visitas: 0 },
+      reutilizada: false,
+      coste_usd: Math.round(coste * 1e6) / 1e6,
+      aviso,
+      lovable_url: lovPrompt ? lovableUrl(lovPrompt, ctx.photos) : null,
       fuentes: { reseñas: ctx.reviews.length, fotos: ctx.photos.length, redes: ctx.socials.length, enlaces_analizados: !!ctx.research }
     });
   })
@@ -493,7 +654,7 @@ demosApi.get(
     if (!ok.length) throw new HttpError(404, 'Lead no encontrado');
     const base = publicBase(req);
     const rows = await query<{ slug: string }>(
-      `SELECT id, slug, tipo, modelo, visitas, ultima_visita, created_at, created_by FROM demos WHERE lead_id = $1 ORDER BY created_at DESC`,
+      `SELECT id, slug, tipo, modelo, calidad, coste_usd, visitas, ultima_visita, created_at, created_by FROM demos WHERE lead_id = $1 ORDER BY created_at DESC`,
       [leadId]
     );
     res.json({ demos: rows.map((d) => ({ ...d, url: `${base}/demo/${d.slug}` })) });

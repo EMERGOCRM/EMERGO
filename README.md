@@ -232,12 +232,20 @@ tiempo se guardan sus datos; el `place_id` se puede guardar indefinidamente.
 
 En la ficha del lead → **Generar demo**:
 
-- **Web con IA:** el servidor reúne la ficha de Google, las reseñas reales
-  (con nombre corto), las fotos reales, el horario, las redes y el texto de
-  sus enlaces públicos, construye el prompt y lo envía a la IA. La web se
-  publica en `/demo/<slug>`, cuenta visitas y se envía por WhatsApp.
-  Configura `ANTHROPIC_API_KEY` (recomendado) u `OPENAI_API_KEY` con un modelo
-  potente (`DEMO_MODEL`). No uses modelos «mini»: la calidad cae mucho.
+- **Web (v1.4.3, económica):** el servidor monta la web con una plantilla
+  profesional por sector usando la ficha de Google, reseñas reales (nombre
+  corto), fotos reales, horario y mapa. La IA solo redacta los textos en un
+  JSON corto con `DEMO_MODEL` (por defecto `claude-haiku-5-5`, ≈0,0003 $ por
+  web). Se publica en `/demo/<slug>`, cuenta visitas y se envía por WhatsApp.
+  Control de gasto (variables en Railway):
+  - `ANTHROPIC_API_KEY` — clave propia de console.anthropic.com (obligatoria para textos con IA).
+  - `DEMO_DAILY_LIMIT` (20) — webs con IA por comercial y día; después, textos de plantilla gratis.
+  - `DEMO_BUDGET_USD` (15) — tope de gasto al mes; al llegar, todo pasa a plantilla.
+  - `DEMO_REUSE_DAYS` (30) — si el negocio ya tiene demo reciente se reutiliza (0 $); «Crear nueva versión» fuerza otra.
+  - `DEMO_MAX_TOKENS` (1200) — salida máxima por web.
+  - `DEMO_PREMIUM_MODEL` (`claude-sonnet-5-5`) — botón «Premium» solo para admin: la IA diseña la web entera (≈0,15 $).
+  Sin clave o si la IA falla, la web sale igual con textos de plantilla.
+  `GET /api/demos/usage` y `/health` muestran gasto y versión.
 - **Demo de CRM:** plantilla profesional con el nombre, el sector y los
   servicios del negocio. Sin IA: instantánea y gratis.
 - **Abrir en Lovable:** abre Lovable con el mismo prompt y las fotos como

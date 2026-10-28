@@ -67,8 +67,28 @@ const fakeApify = http.createServer((req, res) => {
     }
     if (req.url.startsWith('/anthropic/messages')) {
       aiCalls.push({ headers: req.headers, body: json });
+      if (/JSON/.test(json.system || '')) {
+        const copy = {
+          titulo: 'Tu peluquería de confianza en Málaga',
+          subtitulo: 'Cortes y color con trato cercano.',
+          sobre: 'Texto de la IA sobre Peluquería Rosa.',
+          servicios: [
+            { nombre: 'Corte', descripcion: 'Corte a tu medida.' },
+            { nombre: 'Color', descripcion: 'Color profesional.' },
+            { nombre: 'Peinado', descripcion: 'Para eventos.' }
+          ],
+          motivos: [
+            { titulo: 'Trato cercano', texto: 'Lo dicen las reseñas.' },
+            { titulo: 'Resultado', texto: 'Pelo perfecto.' },
+            { titulo: 'Céntrico', texto: 'En Málaga.' }
+          ],
+          cta: 'Reserva tu cita'
+        };
+        res.end(JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(copy) }], usage: { input_tokens: 600, output_tokens: 400 } }));
+        return;
+      }
       const html = '```html\n<!DOCTYPE html><html><head><meta charset="utf-8"></head><body><h1>Peluquería Rosa</h1><script>document.title="x"</script></body></html>\n```';
-      res.end(JSON.stringify({ content: [{ type: 'text', text: html }] }));
+      res.end(JSON.stringify({ content: [{ type: 'text', text: html }], usage: { input_tokens: 3000, output_tokens: 9000 } }));
       return;
     }
     apifyCalls.push({ url: req.url, body: json });
@@ -529,9 +549,15 @@ test('demo web: usa reseñas y fotos reales, se publica aislada y cuenta visitas
   assert.match(prompt, /Rosa me dejó el pelo perfecto/);
   assert.match(prompt, /Marta L\./);
   assert.doesNotMatch(prompt, /Marta López/);
-  assert.match(prompt, /\/media\/place-photo\//);
   assert.match(prompt, /Destacar el trato/);
   assert.equal(aiCalls[0].headers['x-api-key'], 'sk-ant-falsa');
+  // Modo barato: modelo Haiku, salida corta, la IA no escribe HTML.
+  assert.equal(aiCalls[0].body.model, 'claude-haiku-5-5');
+  assert.ok(aiCalls[0].body.max_tokens <= 1500);
+  assert.ok(prompt.length < 3000, `prompt demasiado largo: ${prompt.length}`);
+  assert.equal(r.json.demo.calidad, 'ia');
+  assert.equal(r.json.reutilizada, false);
+  assert.equal(r.json.coste_usd, 0.00026); // 600×0,10 + 400×0,50 por millón
   assert.match(r.json.lovable_url, /^https:\/\/lovable\.dev\/#prompt=/);
   assert.match(r.json.lovable_url, /images=/);
 
@@ -541,10 +567,55 @@ test('demo web: usa reseñas y fotos reales, se publica aislada y cuenta visitas
   const html = await page.text();
   assert.match(html, /^<!DOCTYPE html>/);
   assert.match(html, /noindex/);
+  assert.match(html, /Tu peluquería de confianza en Málaga/);
+  assert.match(html, /Rosa me dejó el pelo perfecto/);
+  assert.match(html, /\/media\/place-photo\//);
+  assert.match(html, /Propuesta de web para Peluquería Rosa/);
   await new Promise((r2) => setTimeout(r2, 100));
   const list = await call('GET', `/api/demos?lead_id=${rosaId}`, { token: tokens.lucia });
   assert.equal(list.json.demos[0].visitas, 1);
   assert.equal((await call('GET', `/api/demos?lead_id=${rosaId}`, { token: tokens.javier })).status, 404);
+});
+
+test('demo web: se reutiliza, límites, presupuesto y premium solo admin', async () => {
+  // Segunda vez: reutiliza sin llamar a la IA.
+  aiCalls.length = 0;
+  const again = await call('POST', '/api/demos', { token: tokens.lucia, body: { lead_id: rosaId, tipo: 'web' } });
+  assert.equal(again.status, 200);
+  assert.equal(again.json.reutilizada, true);
+  assert.equal(aiCalls.length, 0);
+
+  // Nueva versión: sí llama.
+  const nueva = await call('POST', '/api/demos', { token: tokens.lucia, body: { lead_id: rosaId, tipo: 'web', regenerar: true } });
+  assert.equal(nueva.status, 201);
+  assert.equal(aiCalls.length, 1);
+
+  // Si la IA devuelve basura, sale con textos de plantilla (no falla).
+  const usage = await call('GET', '/api/demos/usage', { token: tokens.lucia });
+  assert.equal(usage.status, 200);
+  assert.equal(usage.json.usage.hoy_usuario, 2);
+  assert.ok(usage.json.usage.mes_usd > 0);
+
+  // Premium: solo admin.
+  const prem = await call('POST', '/api/demos', { token: tokens.lucia, body: { lead_id: rosaId, tipo: 'web', calidad: 'premium' } });
+  assert.equal(prem.status, 403);
+  aiCalls.length = 0;
+  const premA = await call('POST', '/api/demos', { token: tokens.admin, body: { lead_id: rosaId, tipo: 'web', calidad: 'premium' } });
+  assert.equal(premA.status, 201, JSON.stringify(premA.json));
+  assert.equal(premA.json.demo.calidad, 'premium');
+  assert.equal(aiCalls[0].body.model, 'claude-sonnet-5-5');
+  assert.match(aiCalls[0].body.messages[0].content, /\/media\/place-photo\//);
+});
+
+test('demo web: plantilla sin coste cuando falla la IA', async () => {
+  const { fallbackCopy, parseCopy, renderWebDemo } = require('../dist/webTemplate');
+  const ctx = { nombre: 'Taller Pepe', sector: 'Taller mecánico', ciudad: 'Sevilla', direccion: '', telefono: '612345678', email: '', rating: null, resenas: 0, maps: '', horario: [], descripcion: '', categorias: [], reviews: [], photos: [], socials: [], research: '' };
+  assert.equal(parseCopy('no es json', ctx), null);
+  const html = renderWebDemo(ctx, fallbackCopy(ctx), 'UTOP-IA');
+  assert.match(html, /Taller Pepe/);
+  assert.match(html, /Pre-ITV/);
+  assert.match(html, /wa\.me\/34612345678/);
+  assert.doesNotMatch(html, /<script/);
 });
 
 test('demo CRM: plantilla personalizada sin IA', async () => {
