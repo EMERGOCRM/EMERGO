@@ -356,6 +356,94 @@ button{font-family:inherit;font-size:inherit;cursor:pointer}
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important}
 }
+
+/* ---- Ficha de lead v1.4.4 ---- */
+.lf-back{margin-bottom:12px}
+.lf-hero{display:grid;grid-template-columns:168px minmax(0,1fr) auto;gap:22px;align-items:center;padding:18px;margin-bottom:14px}
+.lf-photo{position:relative;width:168px;height:168px;border-radius:14px;overflow:hidden;background:var(--surface-3)}
+.lf-photo img{width:100%;height:100%;object-fit:cover;display:block}
+.lf-src{position:absolute;left:8px;bottom:8px;background:rgba(15,23,42,.72);color:#fff}
+.lf-id{display:grid;gap:10px;min-width:0}
+.lf-kicker{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.lf-id h1{margin:0;font-family:var(--f-display);font-size:30px;line-height:1.1;letter-spacing:-.02em;color:var(--ink);overflow-wrap:anywhere}
+.lf-quick{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+.lf-chip{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 12px;border-radius:var(--r-pill);border:1px solid var(--border-2);background:var(--surface);color:var(--ink-2);font-size:13.5px;font-weight:500;text-decoration:none;cursor:pointer;max-width:100%}
+.lf-chip:hover{border-color:var(--accent);color:var(--accent)}
+.lf-chip.wa{background:#E8F8EE;border-color:#BFE8CF;color:#11743F}
+.lf-chip.off{color:var(--muted-2);cursor:default}
+.lf-chip .mono{font-size:13.5px}
+.lf-score{display:grid;justify-items:center;gap:6px;padding:0 10px}
+.lf-score .ring{width:84px;height:84px}
+.lf-score .ring::after{width:66px;height:66px;font-size:20px}
+.lf-score small{font-size:12px;color:var(--muted)}
+.lf-steps{display:flex;align-items:center;width:100%;gap:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-card);padding:14px 18px;margin-bottom:14px;cursor:pointer;text-align:left;font:inherit;color:inherit;flex-wrap:wrap;row-gap:10px}
+.lf-steps:hover{border-color:var(--border-2)}
+.lf-step{display:flex;align-items:center;gap:9px;flex:none}
+.lf-step i{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:12px;font-weight:600;background:var(--surface-3);color:var(--muted);border:1px solid var(--border)}
+.lf-step b{font-size:13.5px;font-weight:500;color:var(--muted)}
+.lf-step small{font-size:11.5px;color:var(--accent);background:var(--accent-tint);border-radius:var(--r-pill);padding:2px 8px;font-weight:600}
+.lf-step.done i{background:var(--ok);border-color:var(--ok);color:#fff}
+.lf-step.done b{color:var(--ink-2)}
+.lf-step.on i{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 0 0 4px var(--accent-tint)}
+.lf-step.on b{color:var(--ink);font-weight:600}
+.lf-bar{flex:1 1 24px;min-width:16px;height:2px;background:var(--border);margin:0 10px;border-radius:2px}
+.lf-steps.closed .lf-step{opacity:.45}
+.lf-closed{margin-left:auto;display:inline-flex;align-items:center;gap:6px;background:var(--danger-tint);color:var(--danger);border-radius:var(--r-pill);padding:5px 12px;font-size:13px;font-weight:600}
+.lf-bar2{display:grid;grid-template-columns:minmax(260px,1fr) auto;gap:14px;align-items:center;margin-bottom:18px}
+.lf-next{display:flex;align-items:center;gap:12px;background:var(--accent-tint);border:1px solid color-mix(in srgb,var(--accent) 25%,transparent);color:var(--accent);border-radius:var(--r-card);padding:10px 12px 10px 14px;min-width:0}
+.lf-next .fill{display:grid;min-width:0}
+.lf-next small{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;font-weight:600;opacity:.85}
+.lf-next b{color:var(--ink);font-size:14.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lf-next em{font-style:normal;font-size:12px;font-weight:600;color:var(--danger)}
+.lf-next.late{background:var(--danger-tint);border-color:color-mix(in srgb,var(--danger) 25%,transparent);color:var(--danger)}
+.lf-next.none{background:var(--surface);border-style:dashed;border-color:var(--border-2);color:var(--muted)}
+.lf-next.none b{color:var(--muted)}
+.lf-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+.icon-only{width:38px;padding:0;justify-content:center}
+.tab-n{display:inline-grid;place-items:center;min-width:20px;height:18px;padding:0 6px;border-radius:var(--r-pill);background:var(--surface-3);color:var(--muted);font-size:11.5px;margin-left:4px}
+.tab.on .tab-n{background:var(--accent-tint);color:var(--accent)}
+.lf-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px;align-items:start}
+.lf-ai{grid-column:1/-1;display:grid;grid-template-columns:auto 1fr;gap:12px;padding:16px 18px;background:linear-gradient(135deg,var(--accent-tint),var(--surface) 70%);color:var(--accent)}
+.lf-ai small{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.lf-ai p{margin:4px 0 0;color:var(--ink);font-size:15px;line-height:1.55}
+.lf-kpis{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.lf-kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-card);padding:14px 16px;display:grid;gap:4px;box-shadow:var(--sh-1)}
+.lf-kpi small{font-size:12px;color:var(--muted)}
+.lf-kpi b{font-family:var(--f-display);font-size:28px;line-height:1.1;color:var(--ink);font-weight:600}
+.lf-stars{color:#E0A100;letter-spacing:2px;font-size:14px}.lf-stars i{color:var(--border-2);font-style:normal}
+.lf-meter{height:6px;border-radius:6px;background:var(--surface-3);overflow:hidden;margin-top:6px}.lf-meter i{display:block;height:100%;background:var(--accent);border-radius:6px}
+.lf-block{padding:16px 18px}
+.lf-span{grid-column:1/-1}
+.lf-bh{display:flex;align-items:center;gap:10px;justify-content:space-between;margin-bottom:12px}
+.lf-bh h3{margin:0;font-size:15px}
+.lf-presgrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.lf-pres{display:flex;gap:10px;align-items:center;border:1px solid var(--border);border-radius:10px;padding:10px 12px;min-width:0}
+.lf-pres .ic{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;flex:none}
+.lf-pres b{display:block;font-size:13.5px;color:var(--ink)}
+.lf-pres small{display:block;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lf-pres.ok .ic{background:var(--ok-tint);color:var(--ok)}.lf-pres.ok small{color:var(--ok)}
+.lf-pres.no .ic{background:var(--surface-3);color:var(--muted-2)}.lf-pres.no small{color:var(--muted)}
+.lf-pres.opp{border-color:color-mix(in srgb,var(--warn) 40%,transparent);background:var(--warn-tint)}.lf-pres.opp .ic{background:var(--warn);color:#fff}.lf-pres.opp small{color:var(--warn);font-weight:600}
+.lf-pres.mid .ic{background:var(--accent-tint);color:var(--accent)}.lf-pres.mid small{color:var(--accent)}
+.lf-list{list-style:none;margin:0;padding:0;display:grid}
+.lf-list li{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-top:1px solid var(--border);color:var(--muted)}
+.lf-list li:first-child{border-top:0;padding-top:2px}
+.lf-list li>svg{margin-top:3px;flex:none}
+.lf-list li>span:not(.avatar){display:grid;gap:1px;min-width:0;flex:1}
+.lf-list small{font-size:12px;color:var(--muted)}
+.lf-list b{font-size:14.5px;font-weight:500;color:var(--ink);overflow-wrap:anywhere}
+.lf-list em{font-style:normal;font-size:12px;color:var(--muted)}
+.lf-robinson{display:inline-flex;align-items:center;gap:5px;color:var(--warn)!important;margin-top:2px}
+.lf-acts{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.lf-acts li{display:grid;grid-template-columns:10px 1fr;gap:10px}
+.lf-acts .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);margin-top:5px}
+.lf-acts .dot.t-nota{background:var(--muted-2)}.lf-acts .dot.t-estado{background:var(--st-presentado)}.lf-acts .dot.t-whatsapp{background:#25D366}
+.lf-acts b{font-size:14px;color:var(--ink);font-weight:600;display:block}
+.lf-acts small{font-size:12px;color:var(--muted)}
+.lf-acts p{margin:4px 0 0;font-size:13.5px;color:var(--ink-2)}
+@media(max-width:1180px){.lf-presgrid{grid-template-columns:repeat(3,minmax(0,1fr))}.lf-bar2{grid-template-columns:1fr}.lf-actions{justify-content:flex-start}}
+@media(max-width:900px){.lf-grid{grid-template-columns:1fr}.lf-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){.lf-src{display:none}.lf-hero{grid-template-columns:96px minmax(0,1fr);gap:14px}.lf-photo{width:96px;height:96px}.lf-score{grid-column:1/-1;grid-template-columns:auto 1fr auto;align-items:center;justify-items:start;padding:0}.lf-score .ring{width:56px;height:56px}.lf-score .ring::after{width:44px;height:44px;font-size:14px}.lf-id h1{font-size:22px}.lf-presgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.lf-hero{align-items:start}.lf-steps{padding:12px;flex-wrap:nowrap}.lf-step b,.lf-step small{display:none}.lf-step.on b{display:inline;font-size:13px}.lf-bar{margin:0 4px;min-width:6px}.lf-closed{display:none}.tabs{overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}.tabs .tab{white-space:nowrap;flex:none}.lf-quick .lf-chip{height:32px}}
 </style>
 </head>
 <body>
@@ -372,7 +460,7 @@ button{font-family:inherit;font-size:inherit;cursor:pointer}
 
 /* Versión visible de la app. Subir en CADA cambio y mantener sincronizados:
    APP_VERSION (aquí), VERSION, README.md y server/package.json. */
-const APP_VERSION='1.4.3';
+const APP_VERSION='1.4.4';
 const APP_RELEASE='28/10/2026';
 
 /* ---------- iconos (familia única, trazo 1.8) ---------- */
@@ -1159,63 +1247,113 @@ function viewTasks(){
 }
 function emptyRow(t){return '<div class="empty" style="padding:28px"><p class="small">'+t+'</p></div>';}
 
-/* ---------- ficha de lead ---------- */
+/* ---------- ficha de lead (v1.4.4) ---------- */
+const LEAD_STEPS=[['nuevo','Nuevo',['nuevo']],['contacto','Contactado',['no_contesta','callback']],['presentado','Presentado',['presentado']],['potencial','Potencial',['potencial']],['convertido','Cliente',['convertido']]];
+const LEAD_CLOSED={no_interes:1,numero_erroneo:1,descartado:1};
+function leadStepper(l){
+  const closed=!!LEAD_CLOSED[l.estado];
+  const cur=LEAD_STEPS.findIndex(s=>s[2].indexOf(l.estado)>=0);
+  return '<button class="lf-steps'+(closed?' closed':'')+'" data-estado="'+l.id+'" title="Cambiar estado">'+
+    LEAD_STEPS.map((s,i)=>{const st=closed?'':i<cur?'done':i===cur?'on':'';
+      return '<span class="lf-step '+st+'"><i>'+(st==='done'?icon('check','sm'):(i+1))+'</i><b>'+s[1]+'</b>'+(st==='on'&&l.estado!==s[0]&&ESTADOS[l.estado]?'<small>'+esc(ESTADOS[l.estado].label)+'</small>':'')+'</span>';}).join('<span class="lf-bar"></span>')+
+    (closed?'<span class="lf-closed">'+icon('alert','sm')+' Cerrado · '+esc(ESTADOS[l.estado].label)+(l.motivo_descarte?' · '+esc(l.motivo_descarte):'')+'</span>':'')+
+  '</button>';
+}
+function num(v,d){const n=Number(v);return isFinite(n)?n:d;}
 function viewLeadDetail(id){
   const l=leadById(id);
   if(!l)return '<div class="empty">'+icon('alert','lg')+'<p>Lead no encontrado.</p></div>';
   if(S.user.rol==='comercial'&&l.asignado_a!==S.user.id&&l.estado!=='convertido')return '<div class="empty">'+icon('lock','lg')+'<p>Este lead está asignado a otro comercial.</p></div>';
   if(l.estado==='convertido'&&!canSeeClients())return '<div class="empty">'+icon('lock','lg')+'<p>Este lead se convirtió en cliente y ya no pertenece al desk de Leads.</p></div>';
   const tab=S.tabs['lead-'+id]||'ficha';
-  const u=userById(l.asignado_a);
-  return '<div class="page-head"><div><a class="btn ghost sm" data-go="#/leads" style="margin-bottom:8px">'+icon('arrowleft','sm')+' Volver a Leads</a><h1>'+esc(l.nombre)+'</h1><div class="row gap8 mt8">'+stPill(l.estado)+scoreBadge(l.score)+webBadge(l)+(l.no_contactar?'<span class="badge" style="background:var(--danger-tint);color:var(--danger)">No contactar</span>':'')+'</div></div>'+
-    '<div class="row gap8 wrap">'+
-      (l.no_contactar?'<button class="btn outline" disabled>'+icon('phone','sm')+' Contacto bloqueado</button>':'<button class="btn outline" data-call="'+l.id+'">'+icon('phone','sm')+' Registrar llamada</button>')+
-      '<button class="btn primary" data-web="'+l.id+'">'+icon('globe','sm')+' Generar web</button>'+
-      '<button class="btn outline" data-demo="'+l.id+'">'+icon('sparkles','sm')+' Generar demo</button>'+
-      '<button class="btn outline" data-next="'+l.id+'">'+icon('clock','sm')+' Próxima acción</button>'+
-      '<button class="btn outline" data-score="'+l.id+'">'+icon('chart','sm')+' Score '+l.score+'</button>'+
+  const tel=String(l.telefono||'').trim();
+  const wa=tel?waNumber(tel):'';
+  const lugar=[l.direccion,l.ciudad].filter(Boolean).join(', ');
+  const nAct=(l.interactions||[]).length;
+  const next=l.proxima_accion?new Date(l.proxima_accion):null;
+  const late=next&&next<new Date()&&!isToday(l.proxima_accion);
+  const blocked=!!l.no_contactar;
+  return '<a class="btn ghost sm lf-back" data-go="#/leads">'+icon('arrowleft','sm')+' Volver a Leads</a>'+
+  '<section class="lf-hero card">'+
+    '<div class="lf-photo"><img src="'+esc(leadImage(l))+'" alt="'+esc(l.sector)+'" data-sector="'+esc(l.sector)+'" onerror="this.onerror=null;this.src=sectorCover(this.getAttribute(\'data-sector\'))"><span class="badge lf-src">'+esc(l.fuente||'Manual')+'</span></div>'+
+    '<div class="lf-id">'+
+      '<div class="lf-kicker">'+esc(l.sector||'Negocio')+(l.ciudad?' · '+esc(l.ciudad):'')+'</div>'+
+      '<h1>'+esc(l.nombre)+'</h1>'+
+      '<div class="row gap8 wrap">'+stPill(l.estado)+webBadge(l)+(blocked?'<span class="badge" style="background:var(--danger-tint);color:var(--danger)">'+icon('lock','sm')+' No contactar</span>':'')+'</div>'+
+      '<div class="lf-quick">'+
+        (tel?'<button class="lf-chip" data-copytxt="'+esc(tel)+'" title="Copiar teléfono">'+icon('phone','sm')+'<span class="mono">'+esc(tel)+'</span>'+icon('copy','sm')+'</button>':'<span class="lf-chip off">'+icon('phone','sm')+' Sin teléfono</span>')+
+        (wa&&!blocked?'<a class="lf-chip wa" href="https://wa.me/'+wa+'" target="_blank" rel="noopener">'+icon('whatsapp','sm')+' WhatsApp</a>':'')+
+        (l.maps?'<a class="lf-chip" href="'+esc(l.maps)+'" target="_blank" rel="noopener">'+icon('pin','sm')+' Ver en Maps</a>':'')+
+        (l.email?'<button class="lf-chip" data-copytxt="'+esc(l.email)+'" title="Copiar email">'+icon('mail','sm')+' '+esc(l.email)+'</button>':'')+
+      '</div>'+
+    '</div>'+
+    '<div class="lf-score"><span class="ring" style="--p:'+num(l.score,0)+'" data-v="'+num(l.score,0)+'"></span><small>Lead score</small><button class="btn ghost sm" data-score="'+l.id+'">Ver detalle</button></div>'+
+  '</section>'+
+  leadStepper(l)+
+  '<div class="lf-bar2">'+
+    '<div class="lf-next'+(late?' late':next?'':' none')+'">'+icon('clock','sm')+
+      '<span class="fill"><small>Próxima acción</small><b>'+(next?esc(fmtDateTime(l.proxima_accion))+(l.proxima_tipo?' · '+esc(l.proxima_tipo):''):'Sin programar')+'</b>'+(late?'<em>Atrasada</em>':'')+'</span>'+
+      '<button class="btn '+(next?'ghost':'outline')+' sm" data-next="'+l.id+'">'+(next?'Cambiar':'Programar')+'</button></div>'+
+    '<div class="lf-actions">'+
+      (blocked?'<button class="btn outline" disabled>'+icon('phone','sm')+' Contacto bloqueado</button>':'<button class="btn primary" data-call="'+l.id+'">'+icon('phone','sm')+' Registrar llamada</button>')+
+      '<button class="btn outline" data-web="'+l.id+'">'+icon('globe','sm')+' Crear web</button>'+
+      '<button class="btn outline" data-demo="'+l.id+'">'+icon('sparkles','sm')+' Demo</button>'+
+      '<button class="btn outline" data-estado="'+l.id+'">'+icon('refresh','sm')+' Estado</button>'+
       (canReassign()?'<button class="btn outline" data-reassign="'+l.id+'">'+icon('users','sm')+' Reasignar</button>':'')+
-      '<button class="btn outline" data-estado="'+l.id+'">'+icon('refresh','sm')+' Cambiar estado</button>'+
-      (isAdmin()?'<button class="btn ghost" data-del-lead="'+l.id+'" style="color:var(--danger)">'+icon('trash','sm')+' Eliminar lead</button>':'')+
-    '</div></div>'+
-  '<div class="lead-hero card mb16"><div class="media"><img src="'+esc(leadImage(l))+'" alt="'+esc(l.sector)+'" data-sector="'+esc(l.sector)+'" onerror="this.onerror=null;this.src=sectorCover(this.getAttribute(\'data-sector\'))"><span class="src badge" style="background:rgba(15,23,42,.72);color:#fff">'+esc(l.fuente)+'</span></div>'+
-    '<div class="card-body"><div class="row gap16 wrap"><span class="fill" style="min-width:260px"><span class="tiny muted">Descripción generada por IA</span><p style="margin:6px 0 0;font-size:15px">'+esc(l.descripcion_ia)+'</p></span>'+
-    '<span class="ring" style="--p:'+l.score+'" data-v="'+l.score+'"></span></div>'+
-    '<div class="row gap24 wrap mt16 tiny muted"><span>'+icon('star','sm')+' '+l.rating+' ★ · '+l.resenas+' reseñas</span><span>'+icon('pin','sm')+' '+esc(l.direccion)+', '+esc(l.ciudad)+'</span><span>'+icon('phone','sm')+' '+esc(l.telefono)+'</span></div></div></div>'+
+      (isAdmin()?'<button class="btn ghost icon-only" data-del-lead="'+l.id+'" title="Eliminar lead" aria-label="Eliminar lead" style="color:var(--danger)">'+icon('trash','sm')+'</button>':'')+
+    '</div>'+
+  '</div>'+
   '<div class="tabs">'+
-    ['ficha:Ficha','actividad:Actividad','demos:Demos y contacto','prompt:Prompt IA','datos:Datos de origen'].map(t=>{const[k,lab]=t.split(':');return '<button class="tab '+(tab===k?'on':'')+'" data-tab="lead-'+id+':'+k+'">'+lab+'</button>';}).join('')+
+    ['ficha:Resumen','actividad:Actividad'+(nAct?' <span class="tab-n">'+nAct+'</span>':''),'demos:Demos y contacto','prompt:Prompt IA','datos:Datos de origen'].map(t=>{const i=t.indexOf(':');const k=t.slice(0,i),lab=t.slice(i+1);return '<button class="tab '+(tab===k?'on':'')+'" data-tab="lead-'+id+':'+k+'">'+lab+'</button>';}).join('')+
   '</div>'+
   '<div id="leadTab">'+(tab==='ficha'?tabFicha(l):tab==='actividad'?tabActividad(l):tab==='demos'?tabDemos(l):tab==='prompt'?tabPrompt(l):tabDatos(l))+'</div>';
 }
 function tabFicha(l){
-  const faltan=[];
-  if(!l.web_tipo)faltan.push('Sin web propia');
-  if(l.redes.indexOf('instagram')<0)faltan.push('Sin Instagram');
-  if(l.redes.indexOf('facebook')<0)faltan.push('Sin Facebook');
-  if(!l.email)faltan.push('Sin email');
-  return '<div class="cols-2">'+
-    '<div class="card"><div class="card-head"><h3>Datos del negocio</h3><span class="fill"></span><a class="btn ghost sm" href="'+esc(l.maps)+'" target="_blank" rel="noopener">'+icon('external','sm')+' Ver en Maps</a></div><div class="card-body">'+
-      '<dl class="kv">'+
-        '<dt>Nombre</dt><dd>'+esc(l.nombre)+'</dd>'+
-        '<dt>Sector</dt><dd>'+esc(l.sector)+'</dd>'+
-        '<dt>Dirección</dt><dd>'+esc(l.direccion)+', '+esc(l.ciudad)+'</dd>'+
-        '<dt>Coordenadas</dt><dd class="mono tiny">'+l.lat.toFixed(4)+', '+l.lng.toFixed(4)+'</dd>'+
-        '<dt>Teléfono</dt><dd class="mono">'+esc(l.telefono)+' <span class="tag line tiny" style="margin-left:6px;color:var(--warn)" title="El CRM no consulta la Lista Robinson: hazlo antes de cada campaña en listarobinson.es">'+icon('shield','sm')+' Lista Robinson: sin comprobar</span></dd>'+
-        '<dt>Email</dt><dd>'+(l.email?esc(l.email):'<span class="muted">No disponible</span>')+'</dd>'+
-        '<dt>Horario</dt><dd>'+esc(l.horario)+'</dd>'+
-        '<dt>Redes</dt><dd>'+(l.redes.length?l.redes.map(r=>'<span class="tag">'+icon(socialIcon(r),'sm')+' '+r+'</span>').join(' '):'<span class="muted">Ninguna</span>')+'</dd>'+
-        '<dt>Asignado a</dt><dd>'+esc(userById(l.asignado_a).nombre)+'</dd>'+
-        '<dt>Fuente</dt><dd>'+esc(l.fuente)+' <span class="muted tiny">· '+esc(l.place_id)+'</span></dd>'+
-      '</dl>'+
-    '</div></div>'+
+  const rating=l.rating===null||l.rating===undefined||l.rating===''?null:num(l.rating,null);
+  const resenas=num(l.resenas,0);
+  const score=num(l.score,0);
+  const redes=l.redes||[];
+  const u=userById(l.asignado_a);
+  const acts=(l.interactions||[]).slice().sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
+  const lastA=acts[0];
+  const lat=num(l.lat,null),lng=num(l.lng,null);
+  const pres=[
+    ['globe','Web propia',!l.web_tipo,l.web_tipo?'Solo '+l.web_tipo:'No tiene'],
+    ['pin','Google Maps',true,rating!==null?rating.toString().replace('.',',')+' ★':'Ficha activa'],
+    ['instagram','Instagram',redes.indexOf('instagram')>=0,redes.indexOf('instagram')>=0?'Activo':'No tiene'],
+    ['facebook','Facebook',redes.indexOf('facebook')>=0,redes.indexOf('facebook')>=0?'Activo':'No tiene'],
+    ['mail','Email',!!l.email,l.email?'Disponible':'No disponible']
+  ];
+  /* Web propia: "tenerla" es lo malo para nosotros → la casilla se marca como oportunidad. */
+  const presHtml=pres.map((p,i)=>{const good=i===0?null:p[2];const cls=i===0?(l.web_tipo?'mid':'opp'):(good?'ok':'no');
+    return '<div class="lf-pres '+cls+'"><span class="ic">'+icon(i===2||i===3?socialIcon(p[0]):p[0],'sm')+'</span><span><b>'+p[1]+'</b><small>'+esc(p[3])+'</small></span></div>';}).join('');
+  const stars=rating!==null?Math.round(rating):0;
+  return '<div class="lf-grid">'+
+    (l.descripcion_ia?'<div class="lf-ai card">'+icon('sparkles','sm')+'<div><small>Resumen del negocio</small><p>'+esc(l.descripcion_ia)+'</p></div></div>':'')+
+    '<div class="lf-kpis">'+
+      '<div class="lf-kpi"><small>Valoración Google</small><b>'+(rating!==null?rating.toFixed(1).replace('.',','):'—')+'</b><span class="lf-stars">'+'★★★★★'.slice(0,stars)+'<i>'+'★★★★★'.slice(0,5-stars)+'</i></span></div>'+
+      '<div class="lf-kpi"><small>Reseñas</small><b>'+resenas+'</b><span class="muted tiny">'+(resenas>100?'Negocio muy consolidado':resenas>30?'Buena reputación':'Pocas reseñas')+'</span></div>'+
+      '<div class="lf-kpi"><small>Lead score</small><b style="color:var(--accent)">'+score+'<span class="tiny muted">/100</span></b><span class="lf-meter"><i style="width:'+Math.max(0,Math.min(100,score))+'%"></i></span></div>'+
+      '<div class="lf-kpi"><small>Intentos de contacto</small><b>'+num(l.intentos,0)+'</b><span class="muted tiny">'+(lastA?'Último: '+esc(ago(lastA.fecha)):'Sin contacto todavía')+'</span></div>'+
+    '</div>'+
+    '<div class="card lf-block lf-span"><div class="lf-bh"><h3>Presencia digital</h3><span class="tiny muted">Lo que tiene y lo que le falta</span></div><div class="lf-presgrid">'+presHtml+'</div></div>'+
+    '<div class="card lf-block"><div class="lf-bh"><h3>Contacto y ubicación</h3>'+(l.maps?'<a class="btn ghost sm" href="'+esc(l.maps)+'" target="_blank" rel="noopener">'+icon('external','sm')+' Maps</a>':'')+'</div>'+
+      '<ul class="lf-list">'+
+        '<li>'+icon('phone','sm')+'<span><small>Teléfono</small><b class="mono">'+(l.telefono?esc(l.telefono):'—')+'</b><em class="lf-robinson" title="El CRM no consulta la Lista Robinson: compruébalo en listarobinson.es antes de cada campaña">'+icon('shield','sm')+' Lista Robinson sin comprobar</em></span></li>'+
+        '<li>'+icon('mail','sm')+'<span><small>Email</small><b>'+(l.email?esc(l.email):'<span class="muted">No disponible</span>')+'</b></span></li>'+
+        '<li>'+icon('pin','sm')+'<span><small>Dirección</small><b>'+(esc([l.direccion,l.ciudad].filter(Boolean).join(', '))||'—')+'</b>'+(lat!==null&&lng!==null?'<em class="mono">'+lat.toFixed(4)+', '+lng.toFixed(4)+'</em>':'')+'</span></li>'+
+        '<li>'+icon('clock','sm')+'<span><small>Horario</small><b>'+(l.horario?esc(l.horario):'—')+'</b></span></li>'+
+      '</ul></div>'+
     '<div class="stack gap16">'+
-      '<div class="card"><div class="card-head"><h3>Estado del negocio</h3></div><div class="card-body">'+
-        '<div class="row gap8 wrap">'+faltan.map(f=>'<span class="tag" style="border-color:var(--border-2)">'+icon('alert','sm')+' '+f+'</span>').join('')+(faltan.length?'':'<span class="tag" style="color:var(--ok)">Perfil completo</span>')+'</div>'+
-      '</div></div>'+
-      '<div class="card"><div class="card-head"><h3>Reputación</h3></div><div class="card-body">'+
-        '<div class="row gap24"><span><span class="tiny muted">Valoración</span><div style="font-family:var(--f-display);font-size:26px">'+l.rating+' ★</div></span><span><span class="tiny muted">Reseñas</span><div style="font-family:var(--f-display);font-size:26px">'+l.resenas+'</div></span><span><span class="tiny muted">Score</span><div style="font-family:var(--f-display);font-size:26px;color:var(--accent)">'+l.score+'</div></span></div>'+
-        '<p class="small muted mt16" style="margin-bottom:0">'+esc(l.resenas>100?'Volumen de reseñas alto: excelente señal de negocio consolidado.':'Volumen de reseñas moderado.')+'</p>'+
-      '</div></div>'+
+      '<div class="card lf-block"><div class="lf-bh"><h3>Gestión</h3></div>'+
+        '<ul class="lf-list">'+
+          '<li>'+av(u)+'<span><small>Asignado a</small><b>'+esc(u.nombre)+'</b></span>'+(canReassign()?'<button class="btn ghost sm" data-reassign="'+l.id+'">Cambiar</button>':'')+'</li>'+
+          '<li>'+icon('search','sm')+'<span><small>Fuente</small><b>'+esc(l.fuente||'Manual')+'</b></span></li>'+
+          '<li>'+icon('calendar','sm')+'<span><small>Alta en el CRM</small><b>'+esc(fmtDate(l.created_at))+'</b></span></li>'+
+        '</ul></div>'+
+      '<div class="card lf-block"><div class="lf-bh"><h3>Última actividad</h3>'+(acts.length?'<button class="btn ghost sm" data-tab="lead-'+l.id+':actividad">Ver todo</button>':'')+'</div>'+
+        (acts.length?'<ul class="lf-acts">'+acts.slice(0,3).map(i=>'<li><span class="dot t-'+esc(i.tipo)+'"></span><span><b>'+esc(tipoLabel(i.tipo))+(i.resultado?' · '+esc(i.resultado):'')+'</b><small>'+esc(userById(i.user_id).nombre)+' · '+esc(ago(i.fecha))+'</small>'+(i.nota?'<p>'+esc(i.nota)+'</p>':'')+'</span></li>').join('')+'</ul>':'<p class="small muted" style="margin:4px 0 0">Todavía no hay llamadas ni notas. Registra la primera llamada desde arriba.</p>')+
+      '</div>'+
     '</div>'+
   '</div>';
 }
@@ -3594,6 +3732,7 @@ function openLeadWebModal(id){openDemoStudio(id);}
 /* =========================================================================
    INIT
    ========================================================================= */
+document.addEventListener('click',function(e){const t=e.target.closest('[data-copytxt]');if(!t)return;const v=t.getAttribute('data-copytxt');const ok=function(){toast('Copiado: '+v,'ok');};try{navigator.clipboard.writeText(v).then(ok,function(){fallbackCopy(v,ok);});}catch(_){fallbackCopy(v,ok);}});
 bindDelegates();
 document.title='UTOP-IA CRM · v'+APP_VERSION;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();if(S.aiOpen){S.aiOpen=false;mountAI();}}});

@@ -14,7 +14,7 @@ import searchesRoutes from './routes/searches';
 import { mediaRouter } from './places';
 import { demosApi, demosPublic } from './demos';
 
-const APP_VERSION = '1.4.3';
+const APP_VERSION = '1.4.4';
 
 const app = express();
 

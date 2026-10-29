@@ -1,0 +1,15 @@
+PARCHE CRM v1.4.3 -> v1.4.4 (nueva ficha de lead + arreglo webs demo)
+====================================================================
+5 archivos. Arrastra el CONTENIDO de esta carpeta a la raíz del
+repositorio en GitHub ("Add file" -> "Upload files"); cada archivo
+cae en su sitio y sustituye al anterior.
+
+  index.html
+  VERSION
+  server/package.json
+  server/src/index.ts
+  server/src/webTemplate.ts   (webs demo sin fotos: botón Llamar legible
+                               y tarjeta de valoración en la portada)
+
+Después: Railway -> "Deploy latest commit" (no "Redeploy").
+Comprueba en /health que pone "version": "1.4.4".

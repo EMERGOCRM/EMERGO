@@ -244,7 +244,13 @@ h1,h2,h3{font-family:var(--fd);line-height:1.08;margin:0;font-weight:600;text-wr
 .hero h1{font-size:clamp(40px,6vw,72px);max-width:15ch}
 .hero p{font-size:clamp(17px,2vw,20px);max-width:52ch;margin:22px 0 32px;opacity:.92}
 .hero .ctas{display:flex;gap:12px;flex-wrap:wrap}
-.hero .ghost{color:#fff}
+.hero .ghost{color:${hero ? '#fff' : 'var(--ink)'}}
+.hero .split{display:grid;grid-template-columns:1.25fr .75fr;gap:48px;align-items:center}
+.hcard{background:#fff;border:1px solid color-mix(in srgb,var(--ink) 8%,transparent);border-radius:22px;padding:28px;box-shadow:0 30px 60px -36px rgba(0,0,0,.35);display:grid;gap:18px}
+.hcard .sc{display:flex;align-items:baseline;gap:10px}.hcard .sc b{font:600 52px/1 var(--fd)}.hcard .sc span{color:#E0A100;letter-spacing:2px}
+.hcard small{color:var(--muted);font-size:14px}
+.hcard ul{list-style:none;margin:0;padding:0;display:grid;gap:10px;border-top:1px solid color-mix(in srgb,var(--ink) 10%,transparent);padding-top:16px;font-size:15px}
+.hcard li{display:flex;gap:10px}.hcard li i{font-style:normal;color:var(--acc)}
 .facts{background:var(--dark);color:#fff}
 .facts .wrap{display:grid;grid-template-columns:repeat(3,1fr);gap:0}
 .facts div{padding:26px 22px}.facts div+div{border-left:1px solid rgba(255,255,255,.12)}
@@ -283,7 +289,7 @@ h2{font-size:clamp(32px,4vw,48px)}
 footer{background:var(--dark);color:rgba(255,255,255,.7);font-size:14px}footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-block:28px}
 .wa-float{position:fixed;right:18px;bottom:18px;z-index:30;width:58px;height:58px;border-radius:50%;background:#25D366;display:grid;place-items:center;box-shadow:0 12px 30px -10px rgba(0,0,0,.45)}
 .wa-float svg{width:30px;height:30px;fill:#fff}
-@media(max-width:860px){nav{display:none}.facts .wrap{grid-template-columns:1fr}.facts div+div{border-left:0;border-top:1px solid rgba(255,255,255,.12)}.about .wrap,.visit .wrap{grid-template-columns:1fr}.gal{grid-template-columns:repeat(2,1fr)}section{padding-block:72px}.hero .wrap{padding-block:84px 80px}header .btn{display:none}}
+@media(max-width:860px){.hero .split{grid-template-columns:1fr;gap:32px}nav{display:none}.facts .wrap{grid-template-columns:1fr}.facts div+div{border-left:0;border-top:1px solid rgba(255,255,255,.12)}.about .wrap,.visit .wrap{grid-template-columns:1fr}.gal{grid-template-columns:repeat(2,1fr)}section{padding-block:72px}.hero .wrap{padding-block:84px 80px}header .btn{display:none}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
 </style></head><body>
 <div class="strip">Propuesta de web para ${e(ctx.nombre)} · preparada por ${e(brand)}</div>
@@ -291,9 +297,13 @@ footer{background:var(--dark);color:rgba(255,255,255,.7);font-size:14px}footer .
 <nav><a href="#servicios">Servicios</a><a href="#nosotros">Nosotros</a>${reviews.length ? '<a href="#opiniones">Opiniones</a>' : ''}<a href="#contacto">Contacto</a></nav>
 ${tel ? `<a class="btn" href="tel:${e(tel)}">Llamar</a>` : ''}</div></header>
 <section class="hero" style="padding:0"><div class="bgimg" role="img" aria-label="${e(ctx.nombre)}"></div><div class="shade"></div><div class="wrap">
-<div class="eyebrow">${e(ctx.sector)}${ctx.ciudad ? ` · ${e(ctx.ciudad)}` : ''}</div>
+${hero ? '' : '<div class="split"><div>'}<div class="eyebrow">${e(ctx.sector)}${ctx.ciudad ? ` · ${e(ctx.ciudad)}` : ''}</div>
 <h1>${e(copy.titulo)}</h1><p>${e(copy.subtitulo)}</p>
-<div class="ctas">${ctaPrimary}${ctaCall}${!ctaPrimary && !ctaCall ? '<a class="btn" href="#contacto">Contactar</a>' : ''}</div></div></section>
+<div class="ctas">${ctaPrimary}${ctaCall}${!ctaPrimary && !ctaCall ? '<a class="btn" href="#contacto">Contactar</a>' : ''}</div>${
+    hero
+      ? ''
+      : `</div><aside class="hcard">${nota ? `<div><div class="sc"><b>${nota}</b><span>${stars(ctx.rating)}</span></div><small>${ctx.resenas} opiniones en Google</small></div>` : `<div><div class="sc"><b style="font-size:34px">${e(ctx.nombre)}</b></div><small>${e(ctx.sector)}</small></div>`}<ul>${ctx.direccion || ctx.ciudad ? `<li><i>●</i>${e(ctx.direccion || ctx.ciudad)}</li>` : ''}${ctx.horario[0] ? `<li><i>●</i>${e(ctx.horario[0])}</li>` : ''}${tel ? `<li><i>●</i>${e(ctx.telefono)}</li>` : ''}</ul></aside></div>`
+  }</div></section>
 <div class="facts"><div class="wrap">
 <div><b>${nota ? `${nota} ★` : e(ctx.sector)}</b><span>${nota ? `${ctx.resenas} opiniones en Google` : 'Negocio local'}</span></div>
 <div><b>${e(ctx.ciudad || 'Cerca de ti')}</b><span>${e(ctx.direccion || 'Atención en nuestro local')}</span></div>
